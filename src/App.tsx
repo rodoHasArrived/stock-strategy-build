@@ -27,6 +27,8 @@ import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { BacktestEngine } from '@/lib/backtestEngine'
 import { DataFrame, readJSON, toDatetime, toNumeric } from '@/lib/dataFrame'
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
+import { cn } from '@/lib/utils'
 
 const createDefaultCell = (index: number, code: string = ''): CodeCell => ({
   id: `cell-${index}`,
@@ -367,6 +369,39 @@ function App() {
     toast.success(`Loaded template: ${template.name}`)
   }
 
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return
+
+    const sourceIndex = result.source.index
+    const destIndex = result.destination.index
+
+    if (sourceIndex === destIndex) return
+
+    setStrategy((current) => {
+      if (!current || !Array.isArray(current.cells)) {
+        return createDefaultStrategy()
+      }
+
+      const newCells = Array.from(current.cells)
+      const [removed] = newCells.splice(sourceIndex, 1)
+      newCells.splice(destIndex, 0, removed)
+
+      const reindexedCells = newCells.map((cell, i) => ({
+        ...cell,
+        id: `cell-${i}`,
+        index: i
+      }))
+
+      return {
+        ...current,
+        cells: reindexedCells,
+        updatedAt: Date.now()
+      }
+    })
+
+    toast.info(`Cell moved from position ${sourceIndex} to ${destIndex}`)
+  }
+
   const handleBacktestRun = async (
     config: BacktestConfig,
     strategyCode: string,
@@ -579,38 +614,65 @@ function App() {
                   </div>
 
                   <TabsContent value="cells" className="mt-0">
-                    <ScrollArea className="h-[calc(100vh-240px)]">
-                      <div className="space-y-4 pr-4">
-                        {safeStrategy.cells.map((cell, index) => (
-                          <div key={cell.id} className="space-y-2">
-                            <CodeCellComponent
-                              cell={cell}
-                              onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
-                              onCellChange={(updates) => handleCellChange(cell.index, updates)}
-                              onRun={() => handleRunCell(cell.index)}
-                              onDelete={() => handleDeleteCell(cell.index)}
-                              comments={cellComments}
-                              onAddComment={handleAddComment}
-                              onDeleteComment={handleDeleteComment}
-                              onResolveComment={handleResolveComment}
-                              currentUser={currentUser}
-                            />
-                            
-                            {index < safeStrategy.cells.length - 1 && (
-                              <TransitionEditor
-                                fromCell={cell.index}
-                                toCell={cell.index + 1}
-                                rules={[]}
-                                onRulesChange={(rules) => {
-                                  console.log('Transition rules updated:', rules)
-                                }}
-                                cellCount={safeStrategy.cells.length}
-                              />
-                            )}
-                          </div>
-                        ))}
+                    <DragDropContext onDragEnd={handleDragEnd}>
+                      <div className="h-[calc(100vh-240px)] overflow-y-auto pr-4">
+                        <Droppable droppableId="cells-list">
+                          {(provided) => (
+                            <div
+                              {...provided.droppableProps}
+                              ref={provided.innerRef}
+                              className="space-y-4"
+                            >
+                              {safeStrategy.cells.map((cell, index) => (
+                                <Draggable key={cell.id} draggableId={cell.id} index={index}>
+                                  {(provided, snapshot) => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      className="space-y-2"
+                                    >
+                                      <div
+                                        className={cn(
+                                          "transition-shadow",
+                                          snapshot.isDragging && "shadow-lg"
+                                        )}
+                                      >
+                                        <CodeCellComponent
+                                          cell={cell}
+                                          onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
+                                          onCellChange={(updates) => handleCellChange(cell.index, updates)}
+                                          onRun={() => handleRunCell(cell.index)}
+                                          onDelete={() => handleDeleteCell(cell.index)}
+                                          comments={cellComments}
+                                          onAddComment={handleAddComment}
+                                          onDeleteComment={handleDeleteComment}
+                                          onResolveComment={handleResolveComment}
+                                          currentUser={currentUser}
+                                          dragHandleProps={provided.dragHandleProps}
+                                        />
+                                      </div>
+                                      
+                                      {index < safeStrategy.cells.length - 1 && (
+                                        <TransitionEditor
+                                          fromCell={cell.index}
+                                          toCell={cell.index + 1}
+                                          rules={[]}
+                                          onRulesChange={(rules) => {
+                                            console.log('Transition rules updated:', rules)
+                                          }}
+                                          cellCount={safeStrategy.cells.length}
+                                        />
+                                      )}
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))}
+                              {provided.placeholder}
+                            </div>
+                          )}
+                        </Droppable>
                       </div>
-                    </ScrollArea>
+                    </DragDropContext>
                   </TabsContent>
 
                   <TabsContent value="flow" className="mt-0">

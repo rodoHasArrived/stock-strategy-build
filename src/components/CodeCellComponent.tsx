@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon, ChatCircle, NoteBlank } from '@phosphor-icons/react'
+import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon, ChatCircle, NoteBlank, DotsSixVertical } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { VisualBuilder } from '@/components/VisualBuilder'
 import { DataFieldSelector } from '@/components/DataFieldSelector'
@@ -14,6 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { CellComments } from '@/components/CellComments'
 import { Input } from '@/components/ui/input'
 import { FormulaAutocomplete } from '@/components/FormulaAutocomplete'
+import { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
 
 interface CodeCellProps {
   cell: CodeCellType
@@ -29,6 +30,7 @@ interface CodeCellProps {
     login: string
     avatarUrl: string
   }
+  dragHandleProps?: DraggableProvidedDragHandleProps | null
 }
 
 export function CodeCellComponent({ 
@@ -41,7 +43,8 @@ export function CodeCellComponent({
   onAddComment,
   onDeleteComment,
   onResolveComment,
-  currentUser
+  currentUser,
+  dragHandleProps
 }: CodeCellProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [cellLabel, setCellLabel] = useState(cell.label || '')
@@ -131,6 +134,9 @@ export function CodeCellComponent({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing flex-shrink-0">
+              <DotsSixVertical size={20} weight="bold" className="text-muted-foreground hover:text-foreground transition-colors" />
+            </div>
             <span className="text-sm font-mono font-medium text-muted-foreground flex-shrink-0">
               [{cell.index}]
             </span>
