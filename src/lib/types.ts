@@ -151,12 +151,37 @@ export interface Security {
   spread?: number
 }
 
+export type ReviewStatus = 'draft' | 'in_review' | 'approved' | 'rejected'
+
+export interface AuditEntry {
+  id: string
+  timestamp: number
+  actor: string
+  action: string
+  details?: string
+  cellId?: string
+}
+
+export interface GovernanceConfig {
+  owner?: string
+  reviewStatus: ReviewStatus
+  reviewers?: string[]
+  reviewNote?: string
+  version: number
+  auditLog: AuditEntry[]
+  publishedAt?: number
+  approvedBy?: string
+}
+
 export interface Strategy {
   id: string
   name: string
   description: string
   cells: CodeCell[]
   parameters: Parameter[]
+  /** Maps fromCell index → transition rules that fire after that cell */
+  transitions: Record<number, TransitionRule[]>
+  governance?: GovernanceConfig
   createdAt: number
   updatedAt: number
 }
