@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MagnifyingGlass, CurrencyDollar, ChartLine, CreditCard, TrendUp } from '@phosphor-icons/react'
+import { MagnifyingGlass, CurrencyDollar, ChartLine, CreditCard, TrendUp, DotsSixVertical } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 export interface AMXDataField {
@@ -16,6 +16,8 @@ export interface AMXDataField {
   description: string
   example: string
   frequency: 'real-time' | 'daily' | 'static'
+  fallback?: string
+  lineage?: string
 }
 
 const AMX_FIELDS: AMXDataField[] = [
@@ -67,7 +69,9 @@ const AMX_FIELDS: AMXDataField[] = [
     type: 'number',
     description: 'Most recent trading price',
     example: '175.43',
-    frequency: 'real-time'
+    frequency: 'real-time',
+    fallback: 'CLEAN_PRICE if unavailable',
+    lineage: 'AMX Market Feed → Pricing Engine → PRICE'
   },
   {
     id: 'clean_price',
@@ -77,7 +81,9 @@ const AMX_FIELDS: AMXDataField[] = [
     type: 'number',
     description: 'Bond price excluding accrued interest',
     example: '98.75',
-    frequency: 'real-time'
+    frequency: 'real-time',
+    fallback: 'Last known clean price (T-1)',
+    lineage: 'AMX Bond Pricing → CLEAN_PRICE'
   },
   {
     id: 'dirty_price',
@@ -197,7 +203,9 @@ const AMX_FIELDS: AMXDataField[] = [
     type: 'percentage',
     description: 'Total return if held to maturity',
     example: '5.61%',
-    frequency: 'real-time'
+    frequency: 'real-time',
+    fallback: 'Approximation via coupon + spread',
+    lineage: 'AMX Analytics → Newton-Raphson solver → YTM'
   },
   {
     id: 'ytc',
@@ -207,7 +215,9 @@ const AMX_FIELDS: AMXDataField[] = [
     type: 'percentage',
     description: 'Yield if called at earliest call date',
     example: '5.12%',
-    frequency: 'real-time'
+    frequency: 'real-time',
+    fallback: 'null if no call schedule',
+    lineage: 'AMX Analytics → Call Schedule → YTC'
   },
   {
     id: 'ytw',
@@ -217,7 +227,9 @@ const AMX_FIELDS: AMXDataField[] = [
     type: 'percentage',
     description: 'Lowest potential yield considering all call dates',
     example: '5.12%',
-    frequency: 'real-time'
+    frequency: 'real-time',
+    fallback: 'YTM if no call schedule exists',
+    lineage: 'AMX Analytics → min(YTM, YTC) → YTW'
   },
   {
     id: 'current_yield',
@@ -227,7 +239,9 @@ const AMX_FIELDS: AMXDataField[] = [
     type: 'percentage',
     description: 'Annual coupon divided by current price',
     example: '5.32%',
-    frequency: 'real-time'
+    frequency: 'real-time',
+    fallback: 'Calculated from COUPON / PRICE',
+    lineage: 'AMX Analytics → coupon / market_price → CURRENT_YIELD'
   },
   {
     id: 'duration',
@@ -267,7 +281,9 @@ const AMX_FIELDS: AMXDataField[] = [
     type: 'text',
     description: 'Credit quality rating',
     example: 'AA-',
-    frequency: 'daily'
+    frequency: 'daily',
+    fallback: 'NR (not rated) if unavailable',
+    lineage: 'Moody\'s / S&P / Fitch → AMX Rating Service → RATING'
   },
   {
     id: 'spread_to_treasury',
@@ -277,7 +293,9 @@ const AMX_FIELDS: AMXDataField[] = [
     type: 'number',
     description: 'Yield spread over comparable Treasury',
     example: '125',
-    frequency: 'real-time'
+    frequency: 'real-time',
+    fallback: 'OAS spread if TSY spread unavailable',
+    lineage: 'AMX Market Feed → Treasury Curve → SPREAD_TSY'
   },
   {
     id: 'eps',
@@ -367,6 +385,11 @@ export function AMXDataCatalog({ onFieldSelect, selectedFields = [] }: AMXDataCa
     }
   }
 
+  const handleDragStart = (e: React.DragEvent, field: AMXDataField) => {
+    e.dataTransfer.setData('text/plain', `${field.function}(cusip)`)
+    e.dataTransfer.effectAllowed = 'copy'
+  }
+
   return (
     <div className="space-y-4">
       <div className="relative">
@@ -405,8 +428,10 @@ export function AMXDataCatalog({ onFieldSelect, selectedFields = [] }: AMXDataCa
                   return (
                     <Card
                       key={field.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, field)}
                       className={cn(
-                        'p-3 cursor-pointer transition-all hover:border-accent',
+                        'p-3 cursor-grab active:cursor-grabbing transition-all hover:border-accent',
                         isSelected && 'ring-2 ring-accent border-accent bg-accent/5'
                       )}
                       onClick={() => onFieldSelect?.(field)}
@@ -415,6 +440,7 @@ export function AMXDataCatalog({ onFieldSelect, selectedFields = [] }: AMXDataCa
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
+                              <DotsSixVertical size={12} className="text-muted-foreground flex-shrink-0" />
                               <span className="font-medium text-sm">{field.name}</span>
                               <Badge 
                                 variant="outline" 
@@ -442,6 +468,24 @@ export function AMXDataCatalog({ onFieldSelect, selectedFields = [] }: AMXDataCa
                         <div className="flex items-center gap-2 text-xs">
                           <span className="text-muted-foreground">Example:</span>
                           <code className="font-mono text-foreground">{field.example}</code>
+                        </div>
+
+                        {field.fallback && (
+                          <div className="flex items-start gap-2 text-xs pt-1 border-t border-border/50">
+                            <span className="text-muted-foreground shrink-0">Fallback:</span>
+                            <span className="text-foreground/80">{field.fallback}</span>
+                          </div>
+                        )}
+
+                        {field.lineage && (
+                          <div className="flex items-start gap-2 text-xs">
+                            <span className="text-muted-foreground shrink-0">Lineage:</span>
+                            <code className="font-mono text-foreground/70 text-[10px] leading-4">{field.lineage}</code>
+                          </div>
+                        )}
+
+                        <div className="text-[10px] text-muted-foreground/60 italic">
+                          Drag to insert into formula
                         </div>
                       </div>
                     </Card>

@@ -17,7 +17,11 @@ import {
   ArrowsClockwise,
   Warning,
   Info,
-  Path
+  Path,
+  CheckCircle,
+  XCircle,
+  Question,
+  Bug
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { TransitionRule, ExecutionPath } from '@/lib/types'
@@ -28,6 +32,18 @@ interface TransitionEditorProps {
   rules: TransitionRule[]
   onRulesChange: (rules: TransitionRule[]) => void
   cellCount: number
+}
+
+const ROUTE_ACTION_LABELS: Record<TransitionRule['action'], { label: string; icon: React.ReactNode; color: string }> = {
+  next: { label: 'Go to Next', icon: <ArrowRight size={14} />, color: '' },
+  goto: { label: 'Go to Cell…', icon: <ArrowRight size={14} />, color: '' },
+  loop: { label: 'Create Loop', icon: <ArrowsClockwise size={14} />, color: '' },
+  while: { label: 'While Loop', icon: <ArrowsClockwise size={14} />, color: '' },
+  stop: { label: 'Stop', icon: <XCircle size={14} />, color: '' },
+  pass: { label: 'Pass ✓', icon: <CheckCircle size={14} className="text-success" />, color: 'text-success' },
+  fail: { label: 'Fail ✗', icon: <XCircle size={14} className="text-destructive" />, color: 'text-destructive' },
+  missing_data: { label: 'Missing Data ?', icon: <Question size={14} className="text-warning" />, color: 'text-warning' },
+  error: { label: 'Error ⚠', icon: <Bug size={14} className="text-destructive" />, color: 'text-destructive' },
 }
 
 export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellCount }: TransitionEditorProps) {
@@ -116,6 +132,16 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
     return warnings
   }, [executionPaths, rules, cellCount])
 
+  // Backward-jump rules that are missing a justification — these are blocking errors
+  const backwardJumpErrors = useMemo(() => {
+    return rules.filter(r =>
+      r.action === 'goto' &&
+      r.target != null &&
+      r.target <= fromCell &&
+      !r.backwardJumpJustification?.trim()
+    )
+  }, [rules, fromCell])
+
   const generateCode = () => {
     return rules.map(rule => {
       if (rule.action === 'loop' && rule.loopConfig) {
@@ -132,6 +158,10 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
       if (!rule.condition) {
         if (rule.action === 'next') return 'next'
         if (rule.action === 'stop') return 'stop'
+        if (rule.action === 'pass') return 'pass'
+        if (rule.action === 'fail') return 'fail'
+        if (rule.action === 'missing_data') return 'missing_data'
+        if (rule.action === 'error') return 'error'
         if (rule.action === 'goto' && rule.target != null) return `goto ${rule.target}`
         if (rule.action === 'while' && rule.target != null) return `while ${rule.condition || 'true'}: goto ${rule.target}`
         return ''
@@ -139,6 +169,10 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
 
       const action = rule.action === 'next' ? 'next' : 
                     rule.action === 'stop' ? 'stop' :
+                    rule.action === 'pass' ? 'pass' :
+                    rule.action === 'fail' ? 'fail' :
+                    rule.action === 'missing_data' ? 'missing_data' :
+                    rule.action === 'error' ? 'error' :
                     rule.action === 'goto' && rule.target != null ? `goto ${rule.target}` :
                     rule.action === 'while' && rule.target != null ? `goto ${rule.target}` : 'next'
       
@@ -228,6 +262,19 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
           </div>
         )}
 
+        {backwardJumpErrors.length > 0 && (
+          <div className="space-y-2">
+            {backwardJumpErrors.map((rule) => (
+              <div key={rule.id} className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/30 text-xs">
+                <Warning size={14} className="text-destructive mt-0.5 flex-shrink-0" weight="bold" />
+                <span className="text-destructive">
+                  Backward jump to cell {rule.target} requires an explicit justification before it can be saved.
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {analysisWarnings.length > 0 && (
           <div className="space-y-2">
             {analysisWarnings.map((warning, idx) => (
@@ -239,7 +286,7 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
           </div>
         )}
 
-        {(showVisualization && executionPaths.length > 0 || analysisWarnings.length > 0) && (
+        {(showVisualization && executionPaths.length > 0 || analysisWarnings.length > 0 || backwardJumpErrors.length > 0) && (
           <Separator />
         )}
 
@@ -251,8 +298,11 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
             </div>
           ) : (
             <div className="space-y-2">
-              {rules.map((rule, index) => (
-                <Card key={rule.id} className="p-3 bg-background">
+              {rules.map((rule, index) => {
+                const isBackwardJump = rule.action === 'goto' && rule.target != null && rule.target <= fromCell
+                const missingJustification = isBackwardJump && !rule.backwardJumpJustification?.trim()
+                return (
+                <Card key={rule.id} className={cn('p-3 bg-background', missingJustification && 'border-destructive')}>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -265,10 +315,16 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
                             Loop
                           </Badge>
                         )}
-                        {rule.action === 'goto' && rule.target != null && rule.target <= fromCell && (
-                          <Badge variant="secondary" className="text-xs gap-1">
+                        {isBackwardJump && (
+                          <Badge variant={missingJustification ? 'destructive' : 'secondary'} className="text-xs gap-1">
                             <ArrowBendUpLeft size={12} />
                             Backward
+                          </Badge>
+                        )}
+                        {(rule.action === 'pass' || rule.action === 'fail' || rule.action === 'missing_data' || rule.action === 'error') && (
+                          <Badge variant="outline" className={cn('text-xs gap-1', ROUTE_ACTION_LABELS[rule.action].color)}>
+                            {ROUTE_ACTION_LABELS[rule.action].icon}
+                            {rule.action.replace('_', ' ')}
                           </Badge>
                         )}
                       </div>
@@ -312,6 +368,10 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
                             <SelectItem value="loop">Create Loop</SelectItem>
                             <SelectItem value="while">While Loop</SelectItem>
                             <SelectItem value="stop">Stop</SelectItem>
+                            <SelectItem value="pass">Pass ✓</SelectItem>
+                            <SelectItem value="fail">Fail ✗</SelectItem>
+                            <SelectItem value="missing_data">Missing Data ?</SelectItem>
+                            <SelectItem value="error">Error ⚠</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -339,6 +399,22 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
                         </div>
                       )}
                     </div>
+
+                    {isBackwardJump && (
+                      <div className="space-y-1 pt-2 border-t border-destructive/20">
+                        <Label className="text-xs text-destructive font-semibold flex items-center gap-1">
+                          <Warning size={12} weight="bold" />
+                          Backward Jump Justification (required)
+                        </Label>
+                        <Input
+                          placeholder="Why is this backward jump necessary?"
+                          value={rule.backwardJumpJustification || ''}
+                          onChange={(e) => updateRule(rule.id, { backwardJumpJustification: e.target.value })}
+                          className={cn('h-8 text-xs', missingJustification && 'border-destructive focus-visible:ring-destructive')}
+                          id={`backward-jump-justification-${rule.id}`}
+                        />
+                      </div>
+                    )}
 
                     {rule.action === 'loop' && (
                       <div className="space-y-2 pt-2 border-t">
@@ -400,7 +476,7 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
                           </div>
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Max Iterations</Label>
+                          <Label className="text-xs text-muted-foreground font-semibold">Max Iterations <span className="text-destructive">*</span></Label>
                           <Input
                             type="number"
                             placeholder="100"
@@ -420,7 +496,7 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Exit Condition (optional)</Label>
+                          <Label className="text-xs text-muted-foreground font-semibold">Exit Condition <span className="text-destructive">*</span></Label>
                           <Input
                             placeholder="e.g., error_count > 0"
                             value={rule.loopConfig?.exitCondition || ''}
@@ -438,12 +514,16 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
                             className="h-8 text-xs font-mono"
                             id={`loop-exit-condition-${rule.id}`}
                           />
+                          {!rule.loopConfig?.exitCondition && (
+                            <p className="text-[10px] text-destructive">Exit condition is required — loops without one will be refused at run time.</p>
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           )}
 

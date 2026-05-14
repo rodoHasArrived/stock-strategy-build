@@ -2,10 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { CodeCell as CodeCellType, CellMode, Condition, CellComment, CellContract } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon, ChatCircle, NoteBlank, DotsSixVertical, Article } from '@phosphor-icons/react'
+import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon, ChatCircle, NoteBlank, DotsSixVertical, Article, CopySimple, CaretDown, CaretRight, Rows, Table } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { VisualBuilder } from '@/components/VisualBuilder'
 import { DataFieldSelector } from '@/components/DataFieldSelector'
@@ -23,6 +22,7 @@ interface CodeCellProps {
   onCodeChange: (code: string) => void
   onRun: () => void
   onDelete: () => void
+  onDuplicate?: () => void
   onCellChange: (updates: Partial<CodeCellType>) => void
   comments?: CellComment[]
   onAddComment?: (cellId: string, text: string, parentId?: string) => void
@@ -40,6 +40,7 @@ export function CodeCellComponent({
   onCodeChange, 
   onRun, 
   onDelete, 
+  onDuplicate,
   onCellChange, 
   comments = [],
   onAddComment,
@@ -144,6 +145,18 @@ export function CodeCellComponent({
             <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing flex-shrink-0">
               <DotsSixVertical size={20} weight="bold" className="text-muted-foreground hover:text-foreground transition-colors" />
             </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 flex-shrink-0"
+              onClick={() => onCellChange({ collapsed: !cell.collapsed })}
+              title={cell.collapsed ? 'Expand cell' : 'Collapse cell'}
+            >
+              {cell.collapsed
+                ? <CaretRight size={14} className="text-muted-foreground" />
+                : <CaretDown size={14} className="text-muted-foreground" />
+              }
+            </Button>
             <span className="text-sm font-mono font-medium text-muted-foreground flex-shrink-0">
               [{cell.index}]
             </span>
@@ -179,6 +192,20 @@ export function CodeCellComponent({
                 <span className="text-xs text-muted-foreground">
                   {cell.executionTime.toFixed(2)}ms
                 </span>
+              )}
+              {cell.rowCountDelta != null && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'text-xs gap-1',
+                    cell.rowCountDelta > 0 && 'text-success border-success/30',
+                    cell.rowCountDelta < 0 && 'text-destructive border-destructive/30',
+                    cell.rowCountDelta === 0 && 'text-muted-foreground'
+                  )}
+                >
+                  <Rows size={12} />
+                  {cell.rowCountDelta > 0 ? '+' : ''}{cell.rowCountDelta} rows
+                </Badge>
               )}
               {cell.controlFlow && (
                 <Badge variant="outline" className="text-xs">
@@ -244,6 +271,17 @@ export function CodeCellComponent({
                 </SheetContent>
               </Sheet>
             )}
+            {onDuplicate && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onDuplicate}
+                title="Duplicate cell"
+                className="h-8"
+              >
+                <CopySimple size={16} />
+              </Button>
+            )}
             <Button
               size="sm"
               onClick={onRun}
@@ -262,118 +300,134 @@ export function CodeCellComponent({
           </div>
         </div>
 
-        {showContractEditor && (
-          <div className="mb-3">
-            <CellContractEditor
-              contract={cell.contract}
-              onChange={handleContractChange}
-              onClose={() => setShowContractEditor(false)}
-            />
-          </div>
-        )}
-
-        {!showContractEditor && cell.contract && (
-          <div className="mb-3">
-            <CellContractDisplay
-              contract={cell.contract}
-              validationResult={cell.validationResult}
-              compact={true}
-            />
-          </div>
-        )}
-
-        <Tabs value={cell.mode} onValueChange={(value) => handleModeChange(value as CellMode)}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="visual" className="text-xs">
-              <Shapes size={14} className="mr-1" />
-              Visual
-            </TabsTrigger>
-            <TabsTrigger value="formula" className="text-xs">
-              <FunctionIcon size={14} className="mr-1" />
-              Formula
-            </TabsTrigger>
-            <TabsTrigger value="code" className="text-xs">
-              <CodeIcon size={14} className="mr-1" />
-              Code
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="visual" className="space-y-3 mt-3">
-            <ScrollArea className="max-h-[400px]">
-              <div className="space-y-4 pr-3">
-                <VisualBuilder
-                  conditions={cell.visualConfig?.conditions || []}
-                  onConditionsChange={handleConditionsChange}
+        {cell.collapsed ? null : (
+          <>
+            {showContractEditor && (
+              <div className="mb-3">
+                <CellContractEditor
+                  contract={cell.contract}
+                  onChange={handleContractChange}
+                  onClose={() => setShowContractEditor(false)}
                 />
-                
-                <div className="border-t pt-4">
-                  <DataFieldSelector
-                    selectedFields={cell.visualConfig?.dataFields || []}
-                    onFieldsChange={handleDataFieldsChange}
-                    aggregation={cell.visualConfig?.aggregation}
-                    onAggregationChange={(agg) => {
-                      const visualConfig = { ...cell.visualConfig, aggregation: agg }
-                      onCellChange({ visualConfig })
-                    }}
-                    sortBy={cell.visualConfig?.sortBy}
-                    sortOrder={cell.visualConfig?.sortOrder}
-                    onSortChange={(sortBy, sortOrder) => {
-                      const visualConfig = { ...cell.visualConfig, sortBy, sortOrder }
-                      onCellChange({ visualConfig })
-                    }}
+              </div>
+            )}
+
+            {!showContractEditor && cell.contract && (
+              <div className="mb-3">
+                <CellContractDisplay
+                  contract={cell.contract}
+                  validationResult={cell.validationResult}
+                  compact={true}
+                />
+              </div>
+            )}
+
+            <Tabs value={cell.mode} onValueChange={(value) => handleModeChange(value as CellMode)}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="visual" className="text-xs">
+                  <Shapes size={14} className="mr-1" />
+                  Visual
+                </TabsTrigger>
+                <TabsTrigger value="formula" className="text-xs">
+                  <FunctionIcon size={14} className="mr-1" />
+                  Formula
+                </TabsTrigger>
+                <TabsTrigger value="code" className="text-xs">
+                  <CodeIcon size={14} className="mr-1" />
+                  Code
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="visual" className="space-y-3 mt-3">
+                <ScrollArea className="max-h-[400px]">
+                  <div className="space-y-4 pr-3">
+                    <VisualBuilder
+                      conditions={cell.visualConfig?.conditions || []}
+                      onConditionsChange={handleConditionsChange}
+                    />
+                    
+                    <div className="border-t pt-4">
+                      <DataFieldSelector
+                        selectedFields={cell.visualConfig?.dataFields || []}
+                        onFieldsChange={handleDataFieldsChange}
+                        aggregation={cell.visualConfig?.aggregation}
+                        onAggregationChange={(agg) => {
+                          const visualConfig = { ...cell.visualConfig, aggregation: agg }
+                          onCellChange({ visualConfig })
+                        }}
+                        sortBy={cell.visualConfig?.sortBy}
+                        sortOrder={cell.visualConfig?.sortOrder}
+                        onSortChange={(sortBy, sortOrder) => {
+                          const visualConfig = { ...cell.visualConfig, sortBy, sortOrder }
+                          onCellChange({ visualConfig })
+                        }}
+                      />
+                    </div>
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="formula" className="mt-3">
+                <div className="space-y-2">
+                  <FormulaAutocomplete
+                    value={cell.code}
+                    onChange={onCodeChange}
+                    onRun={onRun}
+                    placeholder="Enter formula... (e.g., current_yield = )"
+                    className="min-h-[80px] bg-muted/30"
+                    id={`cell-formula-${cell.index}`}
                   />
+                  <div className="text-xs text-muted-foreground">
+                    Start typing a variable name (e.g., "current_yield = ") to see formula suggestions
+                  </div>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="code" className="mt-3">
+                <div className="space-y-2">
+                  <FormulaAutocomplete
+                    value={cell.code}
+                    onChange={onCodeChange}
+                    onRun={onRun}
+                    placeholder="Enter code... (use 'if condition: next', 'goto n', etc.)"
+                    className="min-h-[80px] bg-muted/30"
+                    id={`cell-code-${cell.index}`}
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Press ↑↓ to navigate suggestions, Enter/Tab to accept, Cmd+Enter to run
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            {cell.output && cell.status !== 'error' && (
+              <div className="border-l-4 border-success pl-3 py-2">
+                <div className="text-xs text-muted-foreground mb-1">Output:</div>
+                <pre className="font-mono text-sm whitespace-pre-wrap">{cell.output}</pre>
               </div>
-            </ScrollArea>
-          </TabsContent>
+            )}
 
-          <TabsContent value="formula" className="mt-3">
-            <div className="space-y-2">
-              <FormulaAutocomplete
-                value={cell.code}
-                onChange={onCodeChange}
-                onRun={onRun}
-                placeholder="Enter formula... (e.g., current_yield = )"
-                className="min-h-[80px] bg-muted/30"
-                id={`cell-formula-${cell.index}`}
-              />
-              <div className="text-xs text-muted-foreground">
-                Start typing a variable name (e.g., "current_yield = ") to see formula suggestions
+            {cell.sampleOutput && cell.status === 'success' && cell.sampleOutput !== cell.output && (
+              <div className="border-l-4 border-accent/50 pl-3 py-2">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                  <Table size={12} />
+                  Sample output (first 3 rows):
+                </div>
+                <pre className="font-mono text-xs whitespace-pre-wrap text-muted-foreground max-h-[120px] overflow-auto">
+                  {cell.sampleOutput}
+                </pre>
               </div>
-            </div>
-          </TabsContent>
+            )}
 
-          <TabsContent value="code" className="mt-3">
-            <div className="space-y-2">
-              <FormulaAutocomplete
-                value={cell.code}
-                onChange={onCodeChange}
-                onRun={onRun}
-                placeholder="Enter code... (use 'if condition: next', 'goto n', etc.)"
-                className="min-h-[80px] bg-muted/30"
-                id={`cell-code-${cell.index}`}
-              />
-              <div className="text-xs text-muted-foreground">
-                Press ↑↓ to navigate suggestions, Enter/Tab to accept, Cmd+Enter to run
+            {cell.error && (
+              <div className="border-l-4 border-destructive pl-3 py-2">
+                <div className="text-xs text-destructive mb-1">Error:</div>
+                <pre className="font-mono text-sm text-destructive whitespace-pre-wrap">
+                  {cell.error}
+                </pre>
               </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {cell.output && cell.status !== 'error' && (
-          <div className="border-l-4 border-success pl-3 py-2">
-            <div className="text-xs text-muted-foreground mb-1">Output:</div>
-            <pre className="font-mono text-sm whitespace-pre-wrap">{cell.output}</pre>
-          </div>
-        )}
-
-        {cell.error && (
-          <div className="border-l-4 border-destructive pl-3 py-2">
-            <div className="text-xs text-destructive mb-1">Error:</div>
-            <pre className="font-mono text-sm text-destructive whitespace-pre-wrap">
-              {cell.error}
-            </pre>
-          </div>
+            )}
+          </>
         )}
       </div>
     </Card>
