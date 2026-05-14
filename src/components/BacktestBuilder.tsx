@@ -9,10 +9,11 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { PlayCircle, TrendUp, TrendDown, Equals, Upload, ChartLine, Table as TableIcon, Download, Sparkle } from '@phosphor-icons/react'
+import { PlayCircle, TrendUp, TrendDown, Equals, Upload, ChartLine, Table as TableIcon, Download, Sparkle, BookOpen } from '@phosphor-icons/react'
 import { BacktestResult, BacktestConfig } from '@/lib/types'
 import { toast } from 'sonner'
 import { EquityCurveChart } from '@/components/EquityCurveChart'
+import { StrategyCodeHelper, CommonMistakesGuide } from '@/components/StrategyCodeHelper'
 import { cn } from '@/lib/utils'
 import paData from '@/assets/data/PCG-PA_daily_bars.json'
 import pbData from '@/assets/data/PCG-PB_daily_bars.json'
@@ -54,28 +55,37 @@ const sampleDatasets: SampleDataset[] = [
     strategyTemplate: `// Z-score Mean Reversion Strategy
 // Switches between PA and PB based on yield spread Z-score
 
+// IMPORTANT: df contains only 1 row (current date's data)
+// Access market data via df.data[0]
+const marketData = df.data[0]
+
+// Strategy parameters
 const LOOKBACK = 60
 const MIN_LB = 20
 const Z_ENTER_PB = 0.25
 const Z_RETURN_PA = 0.75
 
-// Calculate rolling mean and std dev of yield spread
-const spreadMA = df.rolling(LOOKBACK, MIN_LB).mean('YieldSpread')
-const spreadSD = df.rolling(LOOKBACK, MIN_LB).std('YieldSpread')
-const Z = (row.YieldSpread - spreadMA[index]) / spreadSD[index]
+// Calculate yield spread (would normally pre-calculate in data prep)
+const paYield = marketData.PA_Yield
+const pbYield = marketData.PB_Yield
+const yieldSpread = paYield - pbYield
 
-// Determine target holding based on Z-score
-if (state.holding === null || state.holding === 'PA') {
-  if (Z < -Z_ENTER_PB) {
-    return { action: 'buy', symbol: 'PB', reason: \`Z-score (\${Z.toFixed(2)}) < -\${Z_ENTER_PB}, switch to PB\` }
+// For demo purposes, using simple threshold logic
+// In production, pre-calculate Z-scores in your data pipeline
+const holding = state.positions?.PA > 0 ? 'PA' : state.positions?.PB > 0 ? 'PB' : null
+
+// Simple spread-based rotation (replace with actual Z-score when available)
+if (holding === null || holding === 'PA') {
+  if (yieldSpread < -0.2) {
+    return { action: 'buy', symbol: 'PB', reason: \`Spread (\${yieldSpread.toFixed(3)}) favors PB\` }
   }
-} else if (state.holding === 'PB') {
-  if (Z > Z_RETURN_PA) {
-    return { action: 'buy', symbol: 'PA', reason: \`Z-score (\${Z.toFixed(2)}) > \${Z_RETURN_PA}, switch to PA\` }
+} else if (holding === 'PB') {
+  if (yieldSpread > 0.2) {
+    return { action: 'buy', symbol: 'PA', reason: \`Spread (\${yieldSpread.toFixed(3)}) favors PA\` }
   }
 }
 
-return { action: 'hold', reason: \`Z-score (\${Z.toFixed(2)}) within range\` }`
+return { action: 'hold', reason: \`Spread (\${yieldSpread.toFixed(3)}) neutral\` }`
   },
   {
     name: 'Corporate Bond Spread',
@@ -90,21 +100,25 @@ return { action: 'hold', reason: \`Z-score (\${Z.toFixed(2)}) within range\` }`
     strategyTemplate: `// Credit Spread Strategy
 // Switch between IG and HY bonds based on spread levels
 
+// Access current market data
+const marketData = df.data[0]
+
+// Strategy parameters  
 const SPREAD_THRESHOLD = 2.5  // percentage points
-const VOLATILITY_LOOKBACK = 20
 
 // Calculate yield spread
-const igYield = row.IG_CORP_Yield
-const hyYield = row.HY_CORP_Yield
+const igYield = marketData.IG_CORP_Yield || 0
+const hyYield = marketData.HY_CORP_Yield || 0
 const spread = hyYield - igYield
 
-// Calculate spread volatility
-const spreadVol = df.rolling(VOLATILITY_LOOKBACK, 10).std('Spread')
+// Determine current holding
+const holding = state.positions?.IG_CORP > 0 ? 'IG_CORP' : 
+                state.positions?.HY_CORP > 0 ? 'HY_CORP' : null
 
 // Risk-off when spread widening, risk-on when spread tightening
-if (spread > SPREAD_THRESHOLD && spreadVol[index] > 0.5) {
+if (spread > SPREAD_THRESHOLD && holding !== 'IG_CORP') {
   return { action: 'buy', symbol: 'IG_CORP', reason: \`Spread (\${spread.toFixed(2)}%) above threshold, flight to quality\` }
-} else if (spread < 1.5 && spreadVol[index] < 0.3) {
+} else if (spread < 1.5 && holding !== 'HY_CORP') {
   return { action: 'buy', symbol: 'HY_CORP', reason: \`Spread (\${spread.toFixed(2)}%) compressed, risk-on\` }
 }
 
@@ -122,29 +136,32 @@ return { action: 'hold', reason: \`Spread (\${spread.toFixed(2)}%) in neutral zo
     strategyTemplate: `// Factor Rotation Strategy
 // Rotate between momentum and value based on relative performance
 
-const LOOKBACK_SHORT = 20
-const LOOKBACK_LONG = 60
-const ROTATION_THRESHOLD = 0.02  // 2% outperformance
+// Access current market data
+const marketData = df.data[0]
 
-// Calculate short-term and long-term relative performance
-const momReturn20 = (row.MOMENTUM_Close - df.getColumn('MOMENTUM_Close')[index - LOOKBACK_SHORT]) / df.getColumn('MOMENTUM_Close')[index - LOOKBACK_SHORT]
-const valReturn20 = (row.VALUE_Close - df.getColumn('VALUE_Close')[index - LOOKBACK_SHORT]) / df.getColumn('VALUE_Close')[index - LOOKBACK_SHORT]
-const relPerf = momReturn20 - valReturn20
+// Strategy parameters
+const ROTATION_THRESHOLD = 0.05  // 5% difference to trigger rotation
 
-// Calculate trend strength
-const momMA = df.rolling(LOOKBACK_LONG, 20).mean('MOMENTUM_Close')
-const valMA = df.rolling(LOOKBACK_LONG, 20).mean('VALUE_Close')
-const momTrend = (row.MOMENTUM_Close - momMA[index]) / momMA[index]
-const valTrend = (row.VALUE_Close - valMA[index]) / valMA[index]
+// Get current prices
+const momClose = marketData.MOMENTUM_Close || 0
+const valClose = marketData.VALUE_Close || 0
 
-// Rotate to stronger factor
-if (relPerf > ROTATION_THRESHOLD && momTrend > 0) {
-  return { action: 'buy', symbol: 'MOMENTUM', reason: \`Momentum outperforming by \${(relPerf*100).toFixed(2)}%\` }
-} else if (relPerf < -ROTATION_THRESHOLD && valTrend > 0) {
-  return { action: 'buy', symbol: 'VALUE', reason: \`Value outperforming by \${(Math.abs(relPerf)*100).toFixed(2)}%\` }
+// Determine current holding
+const holding = state.positions?.MOMENTUM > 0 ? 'MOMENTUM' : 
+                state.positions?.VALUE > 0 ? 'VALUE' : null
+
+// Simple price comparison for rotation
+// In production, pre-calculate normalized returns in your data pipeline
+const priceRatio = momClose / valClose
+
+// Rotate based on relative strength
+if (priceRatio > 1.05 && holding !== 'MOMENTUM') {
+  return { action: 'buy', symbol: 'MOMENTUM', reason: \`Momentum stronger (ratio: \${priceRatio.toFixed(2)})\` }
+} else if (priceRatio < 0.95 && holding !== 'VALUE') {
+  return { action: 'buy', symbol: 'VALUE', reason: \`Value stronger (ratio: \${priceRatio.toFixed(2)})\` }
 }
 
-return { action: 'hold', reason: 'No clear factor advantage' }`
+return { action: 'hold', reason: \`Price ratio \${priceRatio.toFixed(2)} in neutral zone\` }`
   },
   {
     name: 'Sector Rotation (Tech/Utilities)',
@@ -158,27 +175,29 @@ return { action: 'hold', reason: 'No clear factor advantage' }`
     strategyTemplate: `// Sector Rotation Strategy
 // Rotate between growth (Tech) and defensive (Utilities) sectors
 
-const VOLATILITY_LOOKBACK = 30
-const HIGH_VOL_THRESHOLD = 0.015  // 1.5% daily vol
-const MOMENTUM_LOOKBACK = 60
+// Access current market data
+const marketData = df.data[0]
 
-// Calculate market volatility (using TECH as proxy)
-const techReturns = df.getColumn('TECH_Close').map((p, i, arr) => i > 0 ? (p - arr[i-1]) / arr[i-1] : 0)
-const volatility = techReturns.slice(-VOLATILITY_LOOKBACK).reduce((sum, r) => sum + r*r, 0) / VOLATILITY_LOOKBACK
-const dailyVol = Math.sqrt(volatility)
+// Get current prices
+const techClose = marketData.TECH_Close || 0
+const utilClose = marketData.UTIL_Close || 0
 
-// Calculate relative momentum
-const techMom = (row.TECH_Close - df.getColumn('TECH_Close')[index - MOMENTUM_LOOKBACK]) / df.getColumn('TECH_Close')[index - MOMENTUM_LOOKBACK]
-const utilMom = (row.UTIL_Close - df.getColumn('UTIL_Close')[index - MOMENTUM_LOOKBACK]) / df.getColumn('UTIL_Close')[index - MOMENTUM_LOOKBACK]
+// Determine current holding
+const holding = state.positions?.TECH > 0 ? 'TECH' : 
+                state.positions?.UTIL > 0 ? 'UTIL' : null
 
-// High volatility = defensive, low volatility = growth
-if (dailyVol > HIGH_VOL_THRESHOLD) {
-  return { action: 'buy', symbol: 'UTIL', reason: \`High volatility (\${(dailyVol*100).toFixed(2)}%), defensive posture\` }
-} else if (dailyVol < 0.008 && techMom > utilMom) {
-  return { action: 'buy', symbol: 'TECH', reason: \`Low volatility (\${(dailyVol*100).toFixed(2)}%), growth posture\` }
+// Simple relative strength rotation
+// In production, calculate volatility regime and momentum in data pipeline
+const techUtilRatio = techClose / utilClose
+
+// Rotate based on relative performance
+if (techUtilRatio > 2.0 && holding !== 'TECH') {
+  return { action: 'buy', symbol: 'TECH', reason: \`Tech outperforming (ratio: \${techUtilRatio.toFixed(2)})\` }
+} else if (techUtilRatio < 1.5 && holding !== 'UTIL') {
+  return { action: 'buy', symbol: 'UTIL', reason: \`Utilities defensive (ratio: \${techUtilRatio.toFixed(2)})\` }
 }
 
-return { action: 'hold', reason: \`Volatility (\${(dailyVol*100).toFixed(2)}%) in neutral range\` }`
+return { action: 'hold', reason: \`Tech/Util ratio \${techUtilRatio.toFixed(2)} neutral\` }`
   }
 ]
 
@@ -459,10 +478,12 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
         </TabsContent>
 
         <TabsContent value="strategy" className="space-y-4">
+          <StrategyCodeHelper code={strategyCode} />
+          
           <Card>
             <CardHeader>
               <CardTitle>Strategy Code</CardTitle>
-              <CardDescription>Write Python-style strategy logic using DataFrame operations</CardDescription>
+              <CardDescription>Write strategy logic - your function receives (df, state) where df is a DataFrame with 1 row of market data</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Textarea
@@ -471,25 +492,50 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
                 className="font-mono text-sm min-h-[400px]"
                 placeholder="Enter your strategy code..."
               />
-              <div className="border-t pt-4">
-                <Label className="text-sm font-medium">Available APIs:</Label>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2 bg-muted rounded">
-                    <code className="text-accent">DataFrame</code> - pandas-like data structure
+              <div className="border-t pt-4 space-y-3">
+                <div>
+                  <Label className="text-sm font-medium">Available to Your Strategy:</Label>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2 bg-muted rounded">
+                      <code className="text-accent">df</code> - DataFrame with 1 row (current date's data)
+                    </div>
+                    <div className="p-2 bg-muted rounded">
+                      <code className="text-accent">state</code> - {`{ cash, positions, date }`}
+                    </div>
+                    <div className="p-2 bg-muted rounded">
+                      <code className="text-accent">marketData</code> - Access via df.data[0] or use variables
+                    </div>
+                    <div className="p-2 bg-muted rounded">
+                      <code className="text-accent">index</code> - Current position in data (use carefully)
+                    </div>
                   </div>
-                  <div className="p-2 bg-muted rounded">
-                    <code className="text-accent">readJSON(data)</code> - load JSON to DataFrame
-                  </div>
-                  <div className="p-2 bg-muted rounded">
-                    <code className="text-accent">df.rolling(window, minPeriods)</code> - rolling window
-                  </div>
-                  <div className="p-2 bg-muted rounded">
-                    <code className="text-accent">df.merge(other, on, how)</code> - join DataFrames
+                </div>
+                
+                <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
+                  <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+                    <BookOpen size={16} className="text-accent" />
+                    Quick Reference - Accessing Data Safely
+                  </Label>
+                  <div className="space-y-2 text-xs">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Badge variant="destructive" className="text-[10px] mb-1">❌ Don't</Badge>
+                        <pre className="bg-background/70 p-2 rounded font-mono">row.PA_Close</pre>
+                      </div>
+                      <div>
+                        <Badge variant="default" className="text-[10px] mb-1">✓ Do</Badge>
+                        <pre className="bg-background/70 p-2 rounded font-mono">{`const data = df.data[0]
+const price = data.PA_Close`}</pre>
+                      </div>
+                    </div>
+                    <p className="text-muted-foreground italic">The backtest engine passes each date's market data in df.data[0]. Always extract it first or use column access methods.</p>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
+          
+          <CommonMistakesGuide />
         </TabsContent>
 
         <TabsContent value="results" className="space-y-4">
