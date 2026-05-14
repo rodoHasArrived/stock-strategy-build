@@ -32,6 +32,11 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { cn } from '@/lib/utils'
 import { saveStrategyExternal, loadStrategyExternal, saveRunLog, downloadJSON } from '@/lib/persistence'
 
+type ActiveInsertionTarget = {
+  cellIndex: number
+  mode: 'visual' | 'formula' | 'code'
+}
+
 const createDefaultCell = (index: number, code: string = ''): CodeCell => ({
   id: `cell-${index}`,
   index,
@@ -52,6 +57,14 @@ const createDefaultStrategy = (): Strategy => ({
   updatedAt: Date.now()
 })
 
+const getFieldInsertSeparator = (code: string, mode: ActiveInsertionTarget['mode']) => {
+  if (code.trim().length === 0) return ''
+  if (mode === 'code') {
+    return code.endsWith('\n') ? '' : '\n'
+  }
+  return ' '
+}
+
 function App() {
   const [strategy, setStrategy] = useKV<Strategy>('current-strategy', createDefaultStrategy())
   const [currentUser, setCurrentUser] = useState<{ login: string; avatarUrl: string } | undefined>(undefined)
@@ -68,6 +81,10 @@ function App() {
   const [activeTab, setActiveTab] = useState<string>('backtest')
   const [leftPanelTab, setLeftPanelTab] = useState<'data' | 'tools'>('data')
   const [selectedCellForTransition, setSelectedCellForTransition] = useState<number | undefined>(undefined)
+  const [activeInsertionTarget, setActiveInsertionTarget] = useState<ActiveInsertionTarget>({
+    cellIndex: 0,
+    mode: 'formula'
+  })
   
   const [constraints, setConstraints] = useKV<PortfolioConstraint[]>('portfolio-constraints', [])
   const [optimizationConfig, setOptimizationConfig] = useKV<OptimizationConfig>('optimization-config', {
@@ -359,9 +376,86 @@ function App() {
     ? createDefaultStrategy() 
     : strategy
 
+  useEffect(() => {
+    if (activeInsertionTarget.cellIndex < safeStrategy.cells.length) return
+
+    setActiveInsertionTarget((current) => ({
+      ...current,
+      cellIndex: Math.max(0, safeStrategy.cells.length - 1)
+    }))
+  }, [safeStrategy.cells.length])
+
   const handleFieldSelect = (field: AMXDataField) => {
-    toast.info(`Field selected: ${field.function}(cusip)`)
+    const fieldReference = `${field.function}(cusip)`
+    const targetCell = safeStrategy.cells[activeInsertionTarget.cellIndex]
+
+    if (!targetCell) {
+      toast.info('Select a cell to choose where fields should be inserted.')
+      return
+    }
+
+    const nextCells = [...safeStrategy.cells]
+
+    if (activeInsertionTarget.mode === 'visual') {
+      const existingFields = targetCell.visualConfig?.dataFields || []
+      const alreadySelected = existingFields.includes(field.function)
+      nextCells[activeInsertionTarget.cellIndex] = {
+        ...targetCell,
+        visualConfig: {
+          ...targetCell.visualConfig,
+          dataFields: alreadySelected ? existingFields : [...existingFields, field.function]
+        }
+      }
+
+      toast.success(
+        alreadySelected
+          ? `${field.name} is already selected in cell ${targetCell.index}`
+          : `${field.name} added to cell ${targetCell.index}`
+      )
+    } else {
+      nextCells[activeInsertionTarget.cellIndex] = {
+        ...targetCell,
+        code: `${targetCell.code}${getFieldInsertSeparator(targetCell.code, activeInsertionTarget.mode)}${fieldReference}`
+      }
+
+      toast.success(`${field.name} inserted into cell ${targetCell.index}`)
+    }
+
+    setStrategy({
+      ...safeStrategy,
+      cells: nextCells,
+      updatedAt: Date.now()
+    })
   }
+
+  const handleActivateCell = (cellIndex: number, mode: 'visual' | 'formula' | 'code') => {
+    const targetCell = safeStrategy.cells[cellIndex]
+    if (!targetCell) return
+
+    setActiveInsertionTarget({
+      cellIndex,
+      mode
+    })
+  }
+
+  const activeInsertionCell = safeStrategy.cells[activeInsertionTarget.cellIndex]
+  const activeCatalogSelection = activeInsertionTarget.mode === 'visual'
+    ? activeInsertionCell?.visualConfig?.dataFields || []
+    : []
+
+  const activeInsertionSummary = activeInsertionCell
+    ? `Cell ${activeInsertionCell.index} · ${activeInsertionTarget.mode === 'visual' ? 'Visual fields' : activeInsertionTarget.mode === 'formula' ? 'Formula editor' : 'Code editor'}`
+    : 'Choose a cell to insert fields'
+
+  const renderInsertionTargetHint = () => (
+    <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3">
+      <div className="text-xs font-medium text-foreground">Insert target</div>
+      <div className="mt-1 text-sm">{activeInsertionSummary}</div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        Click a field to insert it, or drag it directly into a formula or code editor.
+      </div>
+    </div>
+  )
 
   const handleYieldFormulaGenerate = (formula: string) => {
     const newIndex = safeStrategy.cells.length
@@ -522,7 +616,13 @@ function App() {
           
           <ScrollArea className="h-[calc(100vh-120px)]">
             <TabsContent value="data" className="px-4 pb-4 mt-0">
-              <AMXDataCatalog onFieldSelect={handleFieldSelect} />
+              <div className="space-y-4">
+                {renderInsertionTargetHint()}
+                <AMXDataCatalog
+                  onFieldSelect={handleFieldSelect}
+                  selectedFields={activeCatalogSelection}
+                />
+              </div>
             </TabsContent>
             
             <TabsContent value="tools" className="px-4 pb-4 mt-0 space-y-4">
@@ -613,7 +713,13 @@ function App() {
                     
                     <ScrollArea className="h-[calc(100vh-160px)]">
                       <TabsContent value="data" className="px-4 pb-4 mt-0">
-                        <AMXDataCatalog onFieldSelect={handleFieldSelect} />
+                        <div className="space-y-4">
+                          {renderInsertionTargetHint()}
+                          <AMXDataCatalog
+                            onFieldSelect={handleFieldSelect}
+                            selectedFields={activeCatalogSelection}
+                          />
+                        </div>
                       </TabsContent>
                       
                       <TabsContent value="tools" className="px-4 pb-4 mt-0 space-y-4">
@@ -728,6 +834,8 @@ function App() {
                                           onResolveComment={handleResolveComment}
                                           currentUser={currentUser}
                                           dragHandleProps={provided.dragHandleProps}
+                                          onActivate={(mode) => handleActivateCell(cell.index, mode)}
+                                          isActive={activeInsertionTarget.cellIndex === cell.index}
                                         />
                                       </div>
                                       
