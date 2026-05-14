@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CodeCell, Parameter, Strategy, ExecutionContext } from '@/lib/types'
+import { CodeCell, Parameter, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment } from '@/lib/types'
 import { CodeCellComponent } from '@/components/CodeCellComponent'
 import { ParameterPanel } from '@/components/ParameterPanel'
 import { ContextInspector } from '@/components/ContextInspector'
@@ -9,11 +9,17 @@ import { StrategyExecutor } from '@/lib/executor'
 import { AMXDataCatalog, AMXDataField } from '@/components/AMXDataCatalog'
 import { YieldCalculator } from '@/components/YieldCalculator'
 import { TransitionEditor } from '@/components/TransitionEditor'
+import { ConstraintBuilder } from '@/components/ConstraintBuilder'
+import { OptimizationCell } from '@/components/OptimizationCell'
+import { TradeList } from '@/components/TradeList'
+import { TimeSeriesTools } from '@/components/TimeSeriesTools'
+import { CellComments } from '@/components/CellComments'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { FloppyDisk, Code, Plus, PlayCircle, FlowArrow, Database, Calculator, SidebarSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -52,6 +58,46 @@ function App() {
   const [activeTab, setActiveTab] = useState<string>('cells')
   const [leftPanelTab, setLeftPanelTab] = useState<'data' | 'tools'>('data')
   const [selectedCellForTransition, setSelectedCellForTransition] = useState<number | undefined>(undefined)
+  
+  const [constraints, setConstraints] = useKV<PortfolioConstraint[]>('portfolio-constraints', [])
+  const [optimizationConfig, setOptimizationConfig] = useKV<OptimizationConfig>('optimization-config', {
+    objective: 'maximize_yield',
+    constraints: [],
+    enabled: true
+  })
+  const [mockTrades] = useState<Trade[]>([
+    {
+      id: 'trade-1',
+      security: 'ABC 5.25 2030',
+      cusip: '12345ABC',
+      action: 'buy',
+      quantity: 1500000,
+      price: 98.75,
+      reason: 'BUY_HIGH_SCORE',
+      score: 85.3
+    },
+    {
+      id: 'trade-2',
+      security: 'XYZ 4.80 2029',
+      cusip: '67890XYZ',
+      action: 'sell',
+      quantity: 750000,
+      price: 101.20,
+      reason: 'SELL_FAILED_RATING',
+      reasonDetails: 'Rating downgraded below BBB-',
+      score: 32.1
+    },
+    {
+      id: 'trade-3',
+      security: 'DEF 6.10 2032',
+      cusip: 'DEF123456',
+      action: 'hold',
+      price: 99.10,
+      reason: 'HOLD_WITHIN_TOLERANCE',
+      score: 68.9
+    }
+  ])
+  const [cellComments, setCellComments] = useKV<CellComment[]>('cell-comments', [])
 
   const handleCellCodeChange = (index: number, code: string) => {
     setStrategy((current) => {
@@ -240,6 +286,45 @@ function App() {
     toast.success('Yield formula cell added')
   }
 
+  const handleTimeSeriesGenerate = (config: TimeSeriesConfig) => {
+    const formula = `${config.calculation}(${config.field}, ${config.window})`
+    const newIndex = strategy.cells.length
+    const newCell: CodeCell = createDefaultCell(newIndex, formula)
+    setStrategy((current) => {
+      if (!current || !Array.isArray(current.cells)) {
+        return createDefaultStrategy()
+      }
+      return {
+        ...current,
+        cells: [...current.cells, newCell],
+        updatedAt: Date.now()
+      }
+    })
+    toast.success('Time-series code cell added')
+  }
+
+  const handleAddComment = (cellId: string, text: string, parentId?: string) => {
+    const newComment: CellComment = {
+      id: `comment-${Date.now()}`,
+      cellId,
+      author: 'Current User',
+      text,
+      timestamp: Date.now(),
+      parentId
+    }
+    setCellComments((current) => [...(current || []), newComment])
+  }
+
+  const handleDeleteComment = (commentId: string) => {
+    setCellComments((current) => (current || []).filter(c => c.id !== commentId))
+  }
+
+  const handleResolveComment = (commentId: string) => {
+    setCellComments((current) =>
+      (current || []).map(c => c.id === commentId ? { ...c, resolved: true } : c)
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background flex">
       <Toaster />
@@ -269,7 +354,61 @@ function App() {
             </TabsContent>
             
             <TabsContent value="tools" className="px-4 pb-4 mt-0 space-y-4">
-              <YieldCalculator onGenerateFormula={handleYieldFormulaGenerate} />
+              <Accordion type="multiple" defaultValue={['yield', 'timeseries']} className="space-y-3">
+                <AccordionItem value="yield" className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <span className="text-sm font-medium">Yield Calculator</span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <YieldCalculator onGenerateFormula={handleYieldFormulaGenerate} />
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="timeseries" className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <span className="text-sm font-medium">Time-Series Analysis</span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <TimeSeriesTools onGenerateCode={handleTimeSeriesGenerate} />
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="constraints" className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <span className="text-sm font-medium">Portfolio Constraints</span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ConstraintBuilder 
+                      constraints={constraints || []} 
+                      onConstraintsChange={setConstraints} 
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="optimization" className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <span className="text-sm font-medium">Optimization</span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <OptimizationCell 
+                      config={optimizationConfig || { objective: 'maximize_yield', constraints: [], enabled: true }} 
+                      onConfigChange={setOptimizationConfig} 
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="trades" className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <span className="text-sm font-medium">Trade List</span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <TradeList 
+                      trades={mockTrades}
+                      onExport={() => toast.success('Trade list exported')}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </TabsContent>
           </ScrollArea>
         </Tabs>

@@ -15,6 +15,8 @@ export type CellPurpose =
   | 'portfolio' 
   | 'risk' 
   | 'trade'
+  | 'optimization'
+  | 'constraint'
   | 'general'
 
 export interface Cell {
@@ -131,4 +133,89 @@ export interface ExecutionPath {
   condition?: string
   type: 'default' | 'conditional' | 'loop' | 'branch'
   probability?: number
+}
+
+export type ConstraintType = 'hard' | 'soft'
+export type ConstraintLevel = 'position' | 'issuer' | 'sector' | 'credit' | 'duration' | 'liquidity' | 'custom'
+
+export interface PortfolioConstraint {
+  id: string
+  name: string
+  type: ConstraintType
+  level: ConstraintLevel
+  operator: '>' | '<' | '>=' | '<=' | '=' | 'between'
+  value: number
+  value2?: number
+  unit?: '%' | '$' | 'years' | 'score' | 'rating'
+  penalty?: number
+  description?: string
+  enabled: boolean
+}
+
+export type OptimizationObjective = 
+  | 'maximize_yield'
+  | 'maximize_return'
+  | 'minimize_risk'
+  | 'minimize_tracking_error'
+  | 'custom_score'
+
+export interface OptimizationConfig {
+  objective: OptimizationObjective
+  customObjective?: string
+  constraints: string[]
+  secondaryObjective?: string
+  turnoverLimit?: number
+  enabled: boolean
+}
+
+export type TradeAction = 'buy' | 'sell' | 'hold' | 'reduce' | 'increase'
+export type TradeReason = 
+  | 'BUY_HIGH_SCORE'
+  | 'SELL_FAILED_RATING'
+  | 'SELL_DURATION_LIMIT'
+  | 'HOLD_WITHIN_TOLERANCE'
+  | 'REDUCE_ISSUER_EXPOSURE'
+  | 'REDUCE_SECTOR_EXPOSURE'
+  | 'INCREASE_TO_TARGET'
+  | 'REBALANCE'
+  | 'OPTIMIZATION'
+
+export interface Trade {
+  id: string
+  security: string
+  cusip: string
+  action: TradeAction
+  quantity?: number
+  price?: number
+  reason: TradeReason
+  reasonDetails?: string
+  score?: number
+}
+
+export type TimeWindow = '1M' | '3M' | '6M' | '1Y' | 'custom'
+export type RollingCalculation = 
+  | 'rolling_average'
+  | 'rolling_volatility'
+  | 'rolling_yield'
+  | 'rolling_spread'
+  | 'rolling_return'
+  | 'price_momentum'
+  | 'spread_change'
+
+export interface TimeSeriesConfig {
+  window: TimeWindow
+  customDays?: number
+  calculation: RollingCalculation
+  field: string
+}
+
+export interface CellComment {
+  id: string
+  cellId: string
+  author: string
+  authorAvatar?: string
+  text: string
+  timestamp: number
+  parentId?: string
+  resolved?: boolean
 }

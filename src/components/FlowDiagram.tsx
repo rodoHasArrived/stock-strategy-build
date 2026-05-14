@@ -190,6 +190,8 @@ export function FlowDiagram({ cells, onCellClick, highlightedCell }: FlowDiagram
       portfolio: 'bg-accent/20 text-accent border-accent/30',
       risk: 'bg-destructive/20 text-destructive border-destructive/30',
       trade: 'bg-success/20 text-success border-success/30',
+      optimization: 'bg-warning/20 text-warning border-warning/30',
+      constraint: 'bg-destructive/20 text-destructive border-destructive/30',
       general: 'bg-muted text-muted-foreground border-border'
     }
     return colors[purpose] || colors.general
