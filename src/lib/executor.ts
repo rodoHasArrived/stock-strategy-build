@@ -1,5 +1,6 @@
 import { CodeCell, ExecutionContext, Parameter, Security } from './types'
 import { mockSecurities } from './mockData'
+import { ErrorAnalyzer, formatSmartError } from './errorAnalyzer'
 
 export class StrategyExecutor {
   private context: ExecutionContext
@@ -124,11 +125,16 @@ export class StrategyExecutor {
       }
     } catch (error) {
       const executionTime = performance.now() - startTime
+      
+      const errorAnalyzer = new ErrorAnalyzer(this.cells, this.context, cellIndex)
+      const smartError = errorAnalyzer.analyzeError(error as Error)
+      const formattedError = formatSmartError(smartError)
+      
       return {
         ...cell,
         status: 'error',
         output: '',
-        error: error instanceof Error ? error.message : String(error),
+        error: formattedError,
         executionTime
       }
     }

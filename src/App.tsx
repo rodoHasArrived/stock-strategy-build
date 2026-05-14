@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CodeCell, Parameter, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment } from '@/lib/types'
+import { CodeCell, Parameter, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate } from '@/lib/types'
 import { CodeCellComponent } from '@/components/CodeCellComponent'
 import { ParameterPanel } from '@/components/ParameterPanel'
 import { ContextInspector } from '@/components/ContextInspector'
@@ -14,6 +14,7 @@ import { OptimizationCell } from '@/components/OptimizationCell'
 import { TradeList } from '@/components/TradeList'
 import { TimeSeriesTools } from '@/components/TimeSeriesTools'
 import { CellComments } from '@/components/CellComments'
+import { TemplateGallery } from '@/components/TemplateGallery'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -349,6 +350,20 @@ function App() {
     )
   }
 
+  const handleLoadTemplate = (template: StrategyTemplate) => {
+    const loadedStrategy: Strategy = {
+      id: `strategy-${Date.now()}`,
+      name: template.name,
+      description: template.description,
+      cells: template.strategy.cells,
+      parameters: template.strategy.parameters,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+    setStrategy(loadedStrategy)
+    toast.success(`Loaded template: ${template.name}`)
+  }
+
   return (
     <div className="min-h-screen bg-background flex">
       <Toaster />
@@ -489,6 +504,7 @@ function App() {
               />
             </div>
             <div className="flex items-center gap-2">
+              <TemplateGallery onLoadTemplate={handleLoadTemplate} />
               <Button onClick={handleRunAll} size="sm" variant="default">
                 <PlayCircle size={16} className="mr-2" weight="fill" />
                 <span className="hidden sm:inline">Run All</span>
