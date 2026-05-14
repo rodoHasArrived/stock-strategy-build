@@ -256,7 +256,7 @@ export function FormulaAutocomplete({
 
   const insertAtCursor = (text: string) => {
     if (!textareaRef.current) {
-      onChange(value ? `${value}${value.endsWith('\n') ? '' : '\n'}${text}` : text)
+      onChange(`${value}${text}`)
       return
     }
 

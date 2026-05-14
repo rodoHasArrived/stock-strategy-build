@@ -375,7 +375,7 @@ function App() {
       ...current,
       cellIndex: Math.max(0, safeStrategy.cells.length - 1)
     }))
-  }, [activeInsertionTarget.cellIndex, safeStrategy.cells.length])
+  }, [safeStrategy.cells.length])
 
   const handleFieldSelect = (field: AMXDataField) => {
     const fieldReference = `${field.function}(cusip)`

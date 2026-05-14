@@ -141,16 +141,20 @@ export function CodeCellComponent({
     })
   }, [onRun])
 
+  const appendSnippetToCode = useCallback((snippet: string) => {
+    onCodeChange(cell.code ? `${cell.code}${cell.code.endsWith('\n') ? '' : '\n'}${snippet}` : snippet)
+  }, [cell.code, onCodeChange])
+
   const insertIntoCodeEditor = useCallback((snippet: string) => {
     const editor = editorRef.current
     if (!editor) {
-      onCodeChange(cell.code ? `${cell.code}${cell.code.endsWith('\n') ? '' : '\n'}${snippet}` : snippet)
+      appendSnippetToCode(snippet)
       return
     }
 
     const selection = editor.getSelection()
     if (!selection) {
-      onCodeChange(cell.code ? `${cell.code}${cell.code.endsWith('\n') ? '' : '\n'}${snippet}` : snippet)
+      appendSnippetToCode(snippet)
       return
     }
 
@@ -167,7 +171,7 @@ export function CodeCellComponent({
       onCodeChange(model.getValue())
     }
     editor.focus()
-  }, [cell.code, onCodeChange])
+  }, [appendSnippetToCode, onCodeChange])
 
   return (
     <Card 
@@ -441,7 +445,6 @@ export function CodeCellComponent({
                        'overflow-hidden rounded-md border border-border bg-[#111827] transition-colors',
                        isCodeDropTarget && 'border-accent ring-2 ring-accent/30'
                      )}
-                     onClick={() => setActiveMode('code')}
                      onDragOver={(e) => {
                        e.preventDefault()
                        e.dataTransfer.dropEffect = 'copy'
