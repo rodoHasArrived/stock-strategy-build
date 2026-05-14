@@ -1,0 +1,52 @@
+[
+  {
+    "SessionDate": "2023-01-03",
+    "Close": 425.80,
+    "Volume": 12500000
+  },
+  {
+    "SessionDate": "2023-01-04",
+    "Close": 431.20,
+    "Volume": 13200000
+  },
+  {
+    "SessionDate": "2023-01-05",
+    "Close": 437.90,
+    "Volume": 14100000
+  },
+  {
+    "SessionDate": "2023-01-06",
+    "Close": 442.50,
+    "Volume": 14800000
+  },
+  {
+    "SessionDate": "2023-01-09",
+    "Close": 438.30,
+    "Volume": 13900000
+  },
+  {
+    "SessionDate": "2023-01-10",
+    "Close": 445.60,
+    "Volume": 14500000
+  },
+  {
+    "SessionDate": "2023-01-11",
+    "Close": 451.20,
+    "Volume": 15200000
+  },
+  {
+    "SessionDate": "2023-01-12",
+    "Close": 447.80,
+    "Volume": 14700000
+  },
+  {
+    "SessionDate": "2023-01-13",
+    "Close": 454.30,
+    "Volume": 15500000
+  },
+  {
+    "SessionDate": "2023-01-17",
+    "Close": 460.90,
+    "Volume": 16100000
+  }
+]

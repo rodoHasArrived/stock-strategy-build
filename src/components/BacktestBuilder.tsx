@@ -9,16 +9,74 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { PlayCircle, TrendUp, TrendDown, Equals, Upload, ChartLine, Table as TableIcon, Download } from '@phosphor-icons/react'
+import { PlayCircle, TrendUp, TrendDown, Equals, Upload, ChartLine, Table as TableIcon, Download, Sparkle } from '@phosphor-icons/react'
 import { BacktestResult, BacktestConfig } from '@/lib/types'
 import { toast } from 'sonner'
 import { EquityCurveChart } from '@/components/EquityCurveChart'
 import paData from '@/assets/data/PCG-PA_daily_bars.json'
 import pbData from '@/assets/data/PCG-PB_daily_bars.json'
+import igCorpData from '@/assets/data/ig-corp-bond.json'
+import hyCorpData from '@/assets/data/hy-corp-bond.json'
+import momentumData from '@/assets/data/momentum-equity.json'
+import valueData from '@/assets/data/value-equity.json'
+import techData from '@/assets/data/tech-sector.json'
+import utilData from '@/assets/data/util-sector.json'
 
 interface BacktestBuilderProps {
   onRun: (config: BacktestConfig, strategyCode: string, dataFiles: Record<string, any>) => Promise<BacktestResult>
 }
+
+interface SampleDataset {
+  name: string
+  description: string
+  securities: string[]
+  period: string
+  dataType: string
+  useCase: string
+  coupons?: Record<string, number>
+  data: Record<string, any>
+}
+
+const sampleDatasets: SampleDataset[] = [
+  {
+    name: 'PCG Preferreds (PA/PB)',
+    description: 'Pacific Gas & Electric preferred stocks with quarterly dividends - ideal for yield spread strategies',
+    securities: ['PA', 'PB'],
+    period: '2023 full year',
+    dataType: 'Daily bars with volume',
+    useCase: 'Mean reversion, yield spread trading',
+    coupons: { PA: 1.50, PB: 1.375 },
+    data: { PA: paData, PB: pbData }
+  },
+  {
+    name: 'Corporate Bond Index',
+    description: 'Sample corporate bond prices with credit ratings and duration - test credit quality filters',
+    securities: ['IG_CORP', 'HY_CORP'],
+    period: '2022-2023',
+    dataType: 'Daily prices + fundamentals',
+    useCase: 'Credit spread analysis, duration management',
+    coupons: { IG_CORP: 4.25, HY_CORP: 6.75 },
+    data: { IG_CORP: igCorpData, HY_CORP: hyCorpData }
+  },
+  {
+    name: 'Equity Momentum',
+    description: 'Large cap stocks with different momentum profiles - test trend following strategies',
+    securities: ['MOMENTUM', 'VALUE'],
+    period: '2023',
+    dataType: 'Daily OHLCV',
+    useCase: 'Momentum strategies, factor rotation',
+    data: { MOMENTUM: momentumData, VALUE: valueData }
+  },
+  {
+    name: 'Sector Rotation',
+    description: 'Technology and utilities sector ETFs - test sector rotation logic',
+    securities: ['TECH', 'UTIL'],
+    period: '2023',
+    dataType: 'Daily prices',
+    useCase: 'Sector rotation, defensive vs growth allocation',
+    data: { TECH: techData, UTIL: utilData }
+  }
+]
 
 export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
   const [config, setConfig] = useState<BacktestConfig>({
@@ -72,14 +130,6 @@ return { action: 'hold', reason: \`Z-score (\${Z.toFixed(2)}) within range\` }
     } catch (error) {
       toast.error(`Failed to load ${symbol} data`)
     }
-  }
-
-  const handleLoadSampleData = () => {
-    setDataFiles({
-      PA: paData,
-      PB: pbData
-    })
-    toast.success('Sample data loaded for PA and PB')
   }
 
   const handleRun = async () => {
@@ -187,48 +237,77 @@ return { action: 'hold', reason: \`Z-score (\${Z.toFixed(2)}) within range\` }
           <Card>
             <CardHeader>
               <CardTitle>Data Sources</CardTitle>
-              <CardDescription>Upload JSON files with daily bars for your securities</CardDescription>
+              <CardDescription>Choose from sample datasets or upload your own JSON files</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg bg-accent/5">
-                <div>
-                  <p className="font-medium">PCG Preferred Stock Sample Data</p>
-                  <p className="text-sm text-muted-foreground">2023 daily bars for PCG-PA and PCG-PB</p>
+              <div className="space-y-3">
+                <Label className="text-base flex items-center gap-2">
+                  <Sparkle size={18} weight="fill" className="text-accent" />
+                  Example Datasets
+                </Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {sampleDatasets.map((dataset, idx) => (
+                    <div
+                      key={idx}
+                      className="border rounded-lg p-4 space-y-2 hover:border-accent/50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        setDataFiles(dataset.data)
+                        toast.success(`Loaded ${dataset.name}`)
+                      }}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{dataset.name}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{dataset.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {dataset.securities.map(sec => (
+                          <Badge key={sec} variant="secondary" className="text-[10px] h-5">
+                            {sec}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-0.5 mt-2">
+                        <div>Period: {dataset.period}</div>
+                        <div>Use case: {dataset.useCase}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <Button onClick={handleLoadSampleData} variant="default" size="sm">
-                  <Download size={16} className="mr-2" />
-                  Load Sample Data
-                </Button>
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
-                {['PA', 'PB'].map(symbol => (
-                  <div key={symbol} className="border rounded-lg p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>{symbol} Data</Label>
-                      {dataFiles[symbol] && (
-                        <Badge variant="secondary">
-                          {Array.isArray(dataFiles[symbol]) ? dataFiles[symbol].length : 
-                           dataFiles[symbol].data?.length || 0} rows
-                        </Badge>
-                      )}
+              <div className="border-t pt-4">
+                <Label className="text-base">Custom Upload</Label>
+                <div className="grid grid-cols-1 gap-4 mt-3">
+                  {['PA', 'PB'].map(symbol => (
+                    <div key={symbol} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>{symbol} Data</Label>
+                        {dataFiles[symbol] && (
+                          <Badge variant="secondary">
+                            {Array.isArray(dataFiles[symbol]) ? dataFiles[symbol].length : 
+                             dataFiles[symbol].data?.length || 0} rows
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          type="file"
+                          accept=".json"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleFileUpload(symbol, file)
+                          }}
+                        />
+                        <Button variant="outline" size="sm">
+                          <Upload size={16} className="mr-2" />
+                          Upload
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Input
-                        type="file"
-                        accept=".json"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) handleFileUpload(symbol, file)
-                        }}
-                      />
-                      <Button variant="outline" size="sm">
-                        <Upload size={16} className="mr-2" />
-                        Upload
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
               <div className="border-t pt-4">

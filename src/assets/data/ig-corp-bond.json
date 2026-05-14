@@ -1,0 +1,52 @@
+[
+  {
+    "SessionDate": "2022-01-03",
+    "Close": 98.50,
+    "Volume": 250000
+  },
+  {
+    "SessionDate": "2022-01-04",
+    "Close": 98.75,
+    "Volume": 280000
+  },
+  {
+    "SessionDate": "2022-01-05",
+    "Close": 98.60,
+    "Volume": 220000
+  },
+  {
+    "SessionDate": "2022-01-06",
+    "Close": 98.40,
+    "Volume": 310000
+  },
+  {
+    "SessionDate": "2022-01-07",
+    "Close": 98.25,
+    "Volume": 340000
+  },
+  {
+    "SessionDate": "2022-01-10",
+    "Close": 98.10,
+    "Volume": 290000
+  },
+  {
+    "SessionDate": "2022-01-11",
+    "Close": 97.95,
+    "Volume": 350000
+  },
+  {
+    "SessionDate": "2022-01-12",
+    "Close": 98.20,
+    "Volume": 270000
+  },
+  {
+    "SessionDate": "2022-01-13",
+    "Close": 98.50,
+    "Volume": 240000
+  },
+  {
+    "SessionDate": "2022-01-14",
+    "Close": 98.65,
+    "Volume": 230000
+  }
+]
