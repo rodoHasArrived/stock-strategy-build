@@ -1,74 +1,137 @@
-import { useEffect } from 'react'
+import { useState } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { Cell, Parameter, Strategy, StrategyTemplate } from '@/lib/types'
-import { StrategyGrid } from '@/components/StrategyGrid'
+import { CodeCell, Parameter, Strategy, ExecutionContext } from '@/lib/types'
+import { CodeCellComponent } from '@/components/CodeCellComponent'
 import { ParameterPanel } from '@/components/ParameterPanel'
-import { TemplateGallery } from '@/components/TemplateGallery'
-import { mockSecurities } from '@/lib/mockData'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ContextInspector } from '@/components/ContextInspector'
+import { StrategyExecutor } from '@/lib/executor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { FloppyDisk, Table, Function } from '@phosphor-icons/react'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { FloppyDisk, Code, Plus, PlayCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
-import { evaluateFormula, formatCellValue } from '@/lib/formula'
 
 function App() {
   const [strategy, setStrategy] = useKV<Strategy>('current-strategy', {
     id: 'default',
     name: 'New Strategy',
     description: '',
-    cells: {},
+    cells: [{
+      id: 'cell-0',
+      index: 0,
+      code: '',
+      output: '',
+      status: 'idle'
+    }],
     parameters: [],
-    conditions: [],
     createdAt: Date.now(),
     updatedAt: Date.now()
   })
 
-  useEffect(() => {
-    if (strategy && Object.keys(strategy.cells).length > 0) {
-      recalculateAllCells()
-    }
-  }, [strategy?.parameters])
+  const [executionContext, setExecutionContext] = useState<ExecutionContext>({
+    variables: {},
+    currentCell: 0,
+    maxIterations: 1000,
+    iterationCount: 0
+  })
 
-  const recalculateAllCells = () => {
-    if (!strategy) return
-
-    const paramMap = strategy.parameters.reduce((acc, p) => {
-      acc[p.name] = p.value
-      return acc
-    }, {} as Record<string, number | string>)
-
-    const newCells: Record<string, Cell> = {}
-    
-    Object.entries(strategy.cells).forEach(([id, cell]) => {
-      if (cell.formula) {
-        const result = evaluateFormula(cell.formula, strategy.cells, paramMap, mockSecurities)
-        newCells[id] = {
-          ...cell,
-          value: result.value,
-          displayValue: result.error ? '#ERROR' : formatCellValue(result.value),
-          type: result.error ? 'error' : 'formula',
-          error: result.error
-        }
-      } else {
-        newCells[id] = cell
+  const handleCellCodeChange = (index: number, code: string) => {
+    setStrategy((current) => {
+      const newCells = [...current!.cells]
+      newCells[index] = { ...newCells[index], code }
+      return {
+        ...current!,
+        cells: newCells,
+        updatedAt: Date.now()
       }
     })
-
-    setStrategy((current) => ({
-      ...current!,
-      cells: newCells,
-      updatedAt: Date.now()
-    }))
   }
 
-  const handleCellsChange = (cells: Record<string, Cell>) => {
+  const handleDeleteCell = (index: number) => {
+    setStrategy((current) => {
+      const newCells = current!.cells.filter((_, i) => i !== index)
+      const reindexedCells = newCells.map((cell, i) => ({
+        ...cell,
+        id: `cell-${i}`,
+        index: i
+      }))
+      return {
+        ...current!,
+        cells: reindexedCells.length > 0 ? reindexedCells : [{
+          id: 'cell-0',
+          index: 0,
+          code: '',
+          output: '',
+          status: 'idle'
+        }],
+        updatedAt: Date.now()
+      }
+    })
+  }
+
+  const handleAddCell = () => {
+    setStrategy((current) => {
+      const newIndex = current!.cells.length
+      const newCell: CodeCell = {
+        id: `cell-${newIndex}`,
+        index: newIndex,
+        code: '',
+        output: '',
+        status: 'idle'
+      }
+      return {
+        ...current!,
+        cells: [...current!.cells, newCell],
+        updatedAt: Date.now()
+      }
+    })
+  }
+
+  const handleRunCell = async (index: number) => {
+    if (!strategy) return
+
+    const executor = new StrategyExecutor(strategy.cells, strategy.parameters)
+    
+    setStrategy((current) => {
+      const newCells = [...current!.cells]
+      newCells[index] = { ...newCells[index], status: 'running' }
+      return { ...current!, cells: newCells }
+    })
+
+    const result = await executor.executeCell(index)
+    
+    setStrategy((current) => {
+      const newCells = [...current!.cells]
+      newCells[index] = result
+      return { ...current!, cells: newCells, updatedAt: Date.now() }
+    })
+
+    setExecutionContext(executor.getContext())
+  }
+
+  const handleRunAll = async () => {
+    if (!strategy) return
+
+    toast.info('Running all cells...')
+    
+    const executor = new StrategyExecutor(strategy.cells, strategy.parameters)
+    
     setStrategy((current) => ({
       ...current!,
-      cells,
+      cells: current!.cells.map(cell => ({ ...cell, status: 'running' as const }))
+    }))
+
+    const results = await executor.executeAll()
+    
+    setStrategy((current) => ({
+      ...current!,
+      cells: results,
       updatedAt: Date.now()
     }))
+
+    setExecutionContext(executor.getContext())
+    toast.success('Execution complete')
   }
 
   const handleParametersChange = (parameters: Parameter[]) => {
@@ -79,30 +142,16 @@ function App() {
     }))
   }
 
-  const handleLoadTemplate = (template: StrategyTemplate) => {
-    setStrategy((current) => ({
-      id: `template-${Date.now()}`,
-      name: template.strategy.name,
-      description: template.strategy.description,
-      cells: template.strategy.cells,
-      parameters: template.strategy.parameters,
-      conditions: template.strategy.conditions,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    }))
-    toast.success(`Loaded template: ${template.name}`)
-  }
-
-  const handleSaveStrategy = () => {
-    toast.success('Strategy saved successfully')
-  }
-
   const handleNameChange = (name: string) => {
     setStrategy((current) => ({
       ...current!,
       name,
       updatedAt: Date.now()
     }))
+  }
+
+  const handleSaveStrategy = () => {
+    toast.success('Strategy saved successfully')
   }
 
   if (!strategy) return null
@@ -120,19 +169,23 @@ function App() {
         <div className="container mx-auto h-full flex items-center justify-between px-6">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Table size={28} weight="duotone" className="text-accent" />
-              <h1 className="text-xl font-semibold tracking-tight">Strategy Builder</h1>
+              <Code size={28} weight="duotone" className="text-accent" />
+              <h1 className="text-xl font-semibold tracking-tight">Strategy Executor</h1>
             </div>
             <Input
               value={strategy.name}
               onChange={(e) => handleNameChange(e.target.value)}
               className="w-64 h-9 bg-background"
               placeholder="Strategy name"
+              id="strategy-name"
             />
           </div>
           <div className="flex items-center gap-2">
-            <TemplateGallery onLoadTemplate={handleLoadTemplate} />
-            <Button onClick={handleSaveStrategy} size="sm">
+            <Button onClick={handleRunAll} size="sm" variant="default">
+              <PlayCircle size={16} className="mr-2" weight="fill" />
+              Run All
+            </Button>
+            <Button onClick={handleSaveStrategy} size="sm" variant="secondary">
               <FloppyDisk size={16} className="mr-2" />
               Save
             </Button>
@@ -141,75 +194,68 @@ function App() {
       </div>
 
       <div className="container mx-auto p-6">
-        <Tabs defaultValue="grid" className="space-y-4">
-          <TabsList className="bg-muted">
-            <TabsTrigger value="grid">
-              <Table size={16} className="mr-2" />
-              Strategy Grid
-            </TabsTrigger>
-            <TabsTrigger value="parameters">
-              <Function size={16} className="mr-2" />
-              Parameters
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="grid" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              <div className="lg:col-span-3">
-                <StrategyGrid
-                  cells={strategy.cells}
-                  parameters={strategy.parameters}
-                  securities={mockSecurities}
-                  onCellsChange={handleCellsChange}
-                  rows={20}
-                  cols={8}
-                />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Code Cells</h2>
+                <Button onClick={handleAddCell} size="sm" variant="outline">
+                  <Plus size={16} className="mr-2" />
+                  Add Cell
+                </Button>
               </div>
-              <div className="lg:col-span-1">
-                <ParameterPanel
-                  parameters={strategy.parameters}
-                  onParametersChange={handleParametersChange}
-                />
-              </div>
-            </div>
-          </TabsContent>
 
-          <TabsContent value="parameters">
-            <div className="max-w-2xl mx-auto">
-              <ParameterPanel
-                parameters={strategy.parameters}
-                onParametersChange={handleParametersChange}
-              />
+              <ScrollArea className="h-[calc(100vh-220px)]">
+                <div className="space-y-4 pr-4">
+                  {strategy.cells.map((cell) => (
+                    <CodeCellComponent
+                      key={cell.id}
+                      cell={cell}
+                      onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
+                      onRun={() => handleRunCell(cell.index)}
+                      onDelete={() => handleDeleteCell(cell.index)}
+                    />
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>
+
+          <div className="lg:col-span-1 space-y-4">
+            <ContextInspector context={executionContext} />
+            <ParameterPanel
+              parameters={strategy.parameters}
+              onParametersChange={handleParametersChange}
+            />
+          </div>
+        </div>
 
         <div className="mt-8 p-4 bg-muted/50 rounded-lg border border-border">
-          <h3 className="text-sm font-medium mb-3">Formula Functions</h3>
+          <h3 className="text-sm font-medium mb-3">Control Flow & Syntax</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+            <div className="font-mono">
+              <span className="text-accent font-semibold">if cond: next</span>
+              <p className="text-muted-foreground mt-1">Skip to next cell if true</p>
+            </div>
+            <div className="font-mono">
+              <span className="text-accent font-semibold">if cond: goto 5</span>
+              <p className="text-muted-foreground mt-1">Jump to cell 5 if true</p>
+            </div>
+            <div className="font-mono">
+              <span className="text-accent font-semibold">goto 3</span>
+              <p className="text-muted-foreground mt-1">Jump to cell 3</p>
+            </div>
+            <div className="font-mono">
+              <span className="text-accent font-semibold">next</span>
+              <p className="text-muted-foreground mt-1">Skip to next cell</p>
+            </div>
+            <div className="font-mono">
+              <span className="text-accent font-semibold">__result__ = value</span>
+              <p className="text-muted-foreground mt-1">Set cell output</p>
+            </div>
             <div className="font-mono">
               <span className="text-accent font-semibold">PRICE(cusip)</span>
               <p className="text-muted-foreground mt-1">Get security price</p>
-            </div>
-            <div className="font-mono">
-              <span className="text-accent font-semibold">YIELD(cusip)</span>
-              <p className="text-muted-foreground mt-1">Get security yield</p>
-            </div>
-            <div className="font-mono">
-              <span className="text-accent font-semibold">COUPON(cusip)</span>
-              <p className="text-muted-foreground mt-1">Get coupon rate</p>
-            </div>
-            <div className="font-mono">
-              <span className="text-accent font-semibold">DURATION(cusip)</span>
-              <p className="text-muted-foreground mt-1">Get duration</p>
-            </div>
-            <div className="font-mono">
-              <span className="text-accent font-semibold">SPREAD(cusip)</span>
-              <p className="text-muted-foreground mt-1">Get credit spread</p>
-            </div>
-            <div className="font-mono">
-              <span className="text-accent font-semibold">IF(cond,true,false)</span>
-              <p className="text-muted-foreground mt-1">Conditional logic</p>
             </div>
           </div>
         </div>

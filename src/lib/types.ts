@@ -1,17 +1,29 @@
-export type CellValue = string | number | boolean | null
+export type CellValue = string | number | boolean | null | any
 
-export type CellType = 'value' | 'formula' | 'parameter' | 'error'
+export type ExecutionStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped'
 
-export interface Cell {
+export type ControlFlowType = 'next' | 'goto' | 'if' | 'none'
+
+export interface CodeCell {
   id: string
-  row: number
-  col: number
-  value: CellValue
-  displayValue: string
-  formula?: string
-  type: CellType
+  index: number
+  code: string
+  output: string
   error?: string
-  isCalculating?: boolean
+  status: ExecutionStatus
+  executionTime?: number
+  controlFlow?: {
+    type: ControlFlowType
+    target?: number
+    condition?: string
+  }
+}
+
+export interface ExecutionContext {
+  variables: Record<string, any>
+  currentCell: number
+  maxIterations: number
+  iterationCount: number
 }
 
 export interface Parameter {
@@ -50,9 +62,8 @@ export interface Strategy {
   id: string
   name: string
   description: string
-  cells: Record<string, Cell>
+  cells: CodeCell[]
   parameters: Parameter[]
-  conditions: Condition[]
   createdAt: number
   updatedAt: number
 }

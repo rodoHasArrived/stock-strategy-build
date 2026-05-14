@@ -1,6 +1,6 @@
 # Planning Guide
 
-A sophisticated cell-based investment strategy builder that empowers users to create complex fixed-income and equity trading strategies using fundamental and market data through an intuitive spreadsheet-like interface.
+A sophisticated notebook-style code cell execution engine for investment strategies that allows users to create sequential logic flows with control statements (if/next/goto) while maintaining access to market data, parameters, and variables from previous cells.
 
 **Experience Qualities**: 
 1. **Professional** - Interface should feel like a serious financial tool with precision controls and clear data hierarchy
@@ -8,30 +8,30 @@ A sophisticated cell-based investment strategy builder that empowers users to cr
 3. **Transparent** - Every calculation and condition should be visible and traceable, building trust in the strategy engine
 
 **Complexity Level**: Complex Application (advanced functionality, likely with multiple views)
-- This is a sophisticated strategy builder requiring multiple interconnected features: cell engine with formula parsing, data integration, condition builders, parameter management, strategy execution simulation, and real-time calculation updates across dependent cells.
+- This is a sophisticated code execution engine requiring sequential cell execution, control flow management (if/next/goto), variable scope tracking across cells, market data integration, and execution state visualization with support for loops and conditional branching.
 
 ## Essential Features
 
-### Cell-Based Strategy Engine
-- **Functionality**: Spreadsheet-like grid where users define formulas, reference market data, and create calculations
-- **Purpose**: Provides familiar interface for financial professionals to build strategies using cell references (A1, B2) and formulas
-- **Trigger**: User clicks into any cell to edit
-- **Progression**: Click cell → Enter formula or value → Press Enter → Engine calculates → Dependent cells auto-update → Results display instantly
-- **Success criteria**: Formulas parse correctly, circular references detected, calculations accurate to 4 decimal places
+### Code Cell Execution Engine
+- **Functionality**: Notebook-style sequential code cells that execute in order, each cell can contain logic, calculations, and control flow statements
+- **Purpose**: Provides familiar notebook interface for building investment strategies with procedural logic flow and variable passing between cells
+- **Trigger**: User clicks "Run" on a cell or "Run All" to execute strategy
+- **Progression**: Click Run → Cells execute sequentially (0, 1, 2...) → Variables from previous cells accessible → Control flow (if/next/goto) determines execution path → Output displays in cell → Execution state visualized
+- **Success criteria**: Sequential execution works, variables persist across cells, control flow statements redirect execution correctly, no infinite loops
 
-### Strategy Parameter Configuration
-- **Functionality**: Define strategy inputs like yield thresholds, price ranges, duration targets, coupon rates
-- **Purpose**: Create reusable parameters that drive strategy conditions across multiple cells
-- **Trigger**: User clicks "Add Parameter" button or references undefined variable
-- **Progression**: Click parameter panel → Define name and type → Set default value → Reference in formulas using ${paramName} → Update parameter to see strategy recalculate
-- **Success criteria**: Parameters persist, update propagate instantly, type validation prevents errors
+### Control Flow Statements
+- **Functionality**: Support for if/else conditionals, next (skip to next cell), goto (jump to specific cell), and loop control
+- **Purpose**: Enable complex strategy logic with branching, conditional execution, and iterative processing
+- **Trigger**: User writes control flow keyword in cell code (if condition: next, goto cell_5, etc.)
+- **Progression**: Cell executes → Evaluates condition → Control flow statement determines next cell → Execution jumps accordingly → Loop detection prevents infinite execution
+- **Success criteria**: if/else works correctly, goto jumps to correct cell, next skips current iteration, max 1000 iterations prevent infinite loops
 
-### Condition Builder
-- **Functionality**: Visual interface to create IF/THEN logic for security selection (e.g., IF yield > 5% AND duration < 3 THEN buy)
-- **Purpose**: Enable complex filtering and decision logic without formula syntax knowledge
-- **Trigger**: User clicks "Add Condition" button
-- **Progression**: Click add condition → Select data field (yield/price/coupon/duration) → Choose operator (>/</=/between) → Enter threshold → Chain with AND/OR → Preview matching securities → Apply to strategy
-- **Success criteria**: Conditions evaluate correctly, can chain multiple rules, visual feedback shows matches
+### Variable Scope & Context
+- **Functionality**: Variables defined in previous cells are accessible in all subsequent cells, creating execution context
+- **Purpose**: Build complex multi-step strategies where each cell builds on previous calculations
+- **Trigger**: User references variable from earlier cell in current cell code
+- **Progression**: Cell 0 defines price = 100 → Cell 1 references price → Cell 1 can use/modify price → All cells maintain variable state → Execution context shown in sidebar
+- **Success criteria**: Variables accessible across cells, scope clear, context inspector shows all variables and values
 
 ### Market Data Integration
 - **Functionality**: Access to security fundamentals (coupon, maturity, rating) and market data (price, yield, spread)
