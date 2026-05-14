@@ -449,9 +449,9 @@ function App() {
 
   const renderInsertionTargetHint = () => (
     <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3">
-      <div className="text-xs font-medium text-foreground">Insert target</div>
-      <div className="mt-1 text-sm">{activeInsertionSummary}</div>
-      <div className="mt-1 text-xs text-muted-foreground">
+      <div className="text-sm font-medium text-foreground">Insert target</div>
+      <div className="mt-1.5 text-base">{activeInsertionSummary}</div>
+      <div className="mt-2 text-sm text-muted-foreground leading-relaxed">
         Click a field to insert it, or drag it directly into a formula or code editor.
       </div>
     </div>
@@ -597,19 +597,19 @@ function App() {
       
       <div className="hidden lg:flex lg:flex-col w-80 border-r border-border bg-card/30 flex-shrink-0">
         <div className="h-16 border-b border-border flex items-center px-4 flex-shrink-0">
-          <h2 className="font-semibold flex items-center gap-2">
+          <h2 className="text-base font-semibold flex items-center gap-2">
             <Database size={20} className="text-accent" />
             Data & Tools
           </h2>
         </div>
         <Tabs value={leftPanelTab} onValueChange={(v) => setLeftPanelTab(v as 'data' | 'tools')} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="w-[calc(100%-2rem)] mx-4 mt-4 grid grid-cols-2 flex-shrink-0">
-            <TabsTrigger value="data">
-              <Database size={14} className="mr-2" />
+          <TabsList className="w-[calc(100%-2rem)] mx-4 mt-4 grid grid-cols-2 flex-shrink-0 h-10">
+            <TabsTrigger value="data" className="text-sm">
+              <Database size={16} className="mr-2" />
               AMX Data
             </TabsTrigger>
-            <TabsTrigger value="tools">
-              <Calculator size={14} className="mr-2" />
+            <TabsTrigger value="tools" className="text-sm">
+              <Calculator size={16} className="mr-2" />
               Tools
             </TabsTrigger>
           </TabsList>
@@ -628,8 +628,8 @@ function App() {
             <TabsContent value="tools" className="px-4 pb-4 mt-0 space-y-4">
               <Accordion type="multiple" defaultValue={['yield', 'timeseries']} className="space-y-3">
                 <AccordionItem value="yield" className="border rounded-lg px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <span className="text-sm font-medium">Yield Calculator</span>
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <span className="text-base font-medium">Yield Calculator</span>
                   </AccordionTrigger>
                   <AccordionContent>
                     <YieldCalculator onGenerateFormula={handleYieldFormulaGenerate} />
@@ -637,8 +637,8 @@ function App() {
                 </AccordionItem>
 
                 <AccordionItem value="timeseries" className="border rounded-lg px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <span className="text-sm font-medium">Time-Series Analysis</span>
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <span className="text-base font-medium">Time-Series Analysis</span>
                   </AccordionTrigger>
                   <AccordionContent>
                     <TimeSeriesTools onGenerateCode={handleTimeSeriesGenerate} />
@@ -646,8 +646,8 @@ function App() {
                 </AccordionItem>
 
                 <AccordionItem value="constraints" className="border rounded-lg px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <span className="text-sm font-medium">Portfolio Constraints</span>
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <span className="text-base font-medium">Portfolio Constraints</span>
                   </AccordionTrigger>
                   <AccordionContent>
                     <ConstraintBuilder 
@@ -658,8 +658,8 @@ function App() {
                 </AccordionItem>
 
                 <AccordionItem value="optimization" className="border rounded-lg px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <span className="text-sm font-medium">Optimization</span>
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <span className="text-base font-medium">Optimization</span>
                   </AccordionTrigger>
                   <AccordionContent>
                     <OptimizationCell 
@@ -670,8 +670,8 @@ function App() {
                 </AccordionItem>
 
                 <AccordionItem value="trades" className="border rounded-lg px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <span className="text-sm font-medium">Trade List</span>
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <span className="text-base font-medium">Trade List</span>
                   </AccordionTrigger>
                   <AccordionContent>
                     <TradeList 
@@ -706,9 +706,9 @@ function App() {
                     <SheetTitle>Data & Tools</SheetTitle>
                   </SheetHeader>
                   <Tabs value={leftPanelTab} onValueChange={(v) => setLeftPanelTab(v as 'data' | 'tools')} className="flex-1">
-                    <TabsList className="w-full grid grid-cols-2 m-4">
-                      <TabsTrigger value="data">AMX Data</TabsTrigger>
-                      <TabsTrigger value="tools">Tools</TabsTrigger>
+                    <TabsList className="w-full grid grid-cols-2 m-4 h-10">
+                      <TabsTrigger value="data" className="text-sm">AMX Data</TabsTrigger>
+                      <TabsTrigger value="tools" className="text-sm">Tools</TabsTrigger>
                     </TabsList>
                     
                     <ScrollArea className="h-[calc(100vh-160px)]">
@@ -732,40 +732,40 @@ function App() {
 
               <div className="flex items-center gap-2">
                 <Code size={28} weight="duotone" className="text-accent" />
-                <h1 className="text-xl font-semibold tracking-tight">Strategy Executor</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">Strategy Executor</h1>
               </div>
               <Input
                 value={safeStrategy.name}
                 onChange={(e) => handleNameChange(e.target.value)}
-                className="w-64 h-9 bg-background hidden md:block"
+                className="w-64 h-10 text-base bg-background hidden md:block"
                 placeholder="Strategy name"
                 id="strategy-name"
               />
             </div>
             <div className="flex items-center gap-2">
               <TemplateGallery onLoadTemplate={handleLoadTemplate} />
-              <Button onClick={handleRunAll} size="sm" variant="default">
-                <PlayCircle size={16} className="mr-2" weight="fill" />
-                <span className="hidden sm:inline">Run All</span>
+              <Button onClick={handleRunAll} size="default" variant="default">
+                <PlayCircle size={18} className="mr-2" weight="fill" />
+                <span className="hidden sm:inline text-sm">Run All</span>
               </Button>
               <Button
                 onClick={handleExportRunTrace}
-                size="sm"
+                size="default"
                 variant="outline"
                 title="Export run trace"
                 className={cn(runTrace.length > 0 && 'border-accent text-accent')}
               >
-                <DownloadSimple size={16} className="mr-1" />
-                <span className="hidden sm:inline">Trace</span>
+                <DownloadSimple size={18} className="mr-1.5" />
+                <span className="hidden sm:inline text-sm">Trace</span>
                 {runTrace.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                  <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
                     {runTrace.length}
                   </Badge>
                 )}
               </Button>
-              <Button onClick={handleSaveStrategy} size="sm" variant="secondary">
-                <FloppyDisk size={16} className="mr-2" />
-                <span className="hidden sm:inline">Save</span>
+              <Button onClick={handleSaveStrategy} size="default" variant="secondary">
+                <FloppyDisk size={18} className="mr-2" />
+                <span className="hidden sm:inline text-sm">Save</span>
               </Button>
             </div>
           </div>
@@ -778,23 +778,23 @@ function App() {
                 <div className="lg:col-span-3 flex flex-col min-h-0">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
                     <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                      <TabsList>
-                        <TabsTrigger value="cells" className="gap-2">
+                      <TabsList className="h-10">
+                        <TabsTrigger value="cells" className="gap-2 text-sm">
                           <Code size={16} />
                           Code Cells
                         </TabsTrigger>
-                        <TabsTrigger value="flow" className="gap-2">
+                        <TabsTrigger value="flow" className="gap-2 text-sm">
                           <FlowArrow size={16} />
                           Execution Flow
                         </TabsTrigger>
-                        <TabsTrigger value="backtest" className="gap-2">
+                        <TabsTrigger value="backtest" className="gap-2 text-sm">
                           <ChartLine size={16} />
                           Backtest
                         </TabsTrigger>
                       </TabsList>
-                      <Button onClick={handleAddCell} size="sm" variant="outline">
-                        <Plus size={16} className="mr-2" />
-                        Add Cell
+                      <Button onClick={handleAddCell} size="default" variant="outline">
+                        <Plus size={18} className="mr-2" />
+                        <span className="text-sm">Add Cell</span>
                       </Button>
                     </div>
 
@@ -903,32 +903,32 @@ function App() {
           </div>
 
           <div className="container mx-auto px-6 pb-6">
-            <div className="p-4 bg-muted/50 rounded-lg border border-border">
-              <h3 className="text-sm font-medium mb-3">Control Flow & Syntax</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+            <div className="p-5 bg-muted/50 rounded-lg border border-border">
+              <h3 className="text-base font-medium mb-4">Control Flow & Syntax</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                 <div className="font-mono">
-                  <span className="text-accent font-semibold">if cond: next</span>
-                  <p className="text-muted-foreground mt-1">Skip to next cell if true</p>
+                  <span className="text-accent font-semibold text-base">if cond: next</span>
+                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Skip to next cell if true</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold">if cond: goto 5</span>
-                  <p className="text-muted-foreground mt-1">Jump to cell 5 if true</p>
+                  <span className="text-accent font-semibold text-base">if cond: goto 5</span>
+                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Jump to cell 5 if true</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold">goto 3</span>
-                  <p className="text-muted-foreground mt-1">Jump to cell 3</p>
+                  <span className="text-accent font-semibold text-base">goto 3</span>
+                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Jump to cell 3</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold">next</span>
-                  <p className="text-muted-foreground mt-1">Skip to next cell</p>
+                  <span className="text-accent font-semibold text-base">next</span>
+                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Skip to next cell</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold">__result__ = value</span>
-                  <p className="text-muted-foreground mt-1">Set cell output</p>
+                  <span className="text-accent font-semibold text-base">__result__ = value</span>
+                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Set cell output</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold">PRICE(cusip)</span>
-                  <p className="text-muted-foreground mt-1">Get security price</p>
+                  <span className="text-accent font-semibold text-base">PRICE(cusip)</span>
+                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Get security price</p>
                 </div>
               </div>
             </div>
