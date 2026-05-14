@@ -13,6 +13,7 @@ import { PlayCircle, TrendUp, TrendDown, Equals, Upload, ChartLine, Table as Tab
 import { BacktestResult, BacktestConfig } from '@/lib/types'
 import { toast } from 'sonner'
 import { EquityCurveChart } from '@/components/EquityCurveChart'
+import { cn } from '@/lib/utils'
 import paData from '@/assets/data/PCG-PA_daily_bars.json'
 import pbData from '@/assets/data/PCG-PB_daily_bars.json'
 import igCorpData from '@/assets/data/ig-corp-bond.json'
@@ -35,6 +36,8 @@ interface SampleDataset {
   useCase: string
   coupons?: Record<string, number>
   data: Record<string, any>
+  strategyTemplate: string
+  category: 'fixed-income' | 'equity' | 'sector' | 'factor'
 }
 
 const sampleDatasets: SampleDataset[] = [
@@ -45,48 +48,10 @@ const sampleDatasets: SampleDataset[] = [
     period: '2023 full year',
     dataType: 'Daily bars with volume',
     useCase: 'Mean reversion, yield spread trading',
+    category: 'fixed-income',
     coupons: { PA: 1.50, PB: 1.375 },
-    data: { PA: paData, PB: pbData }
-  },
-  {
-    name: 'Corporate Bond Index',
-    description: 'Sample corporate bond prices with credit ratings and duration - test credit quality filters',
-    securities: ['IG_CORP', 'HY_CORP'],
-    period: '2022-2023',
-    dataType: 'Daily prices + fundamentals',
-    useCase: 'Credit spread analysis, duration management',
-    coupons: { IG_CORP: 4.25, HY_CORP: 6.75 },
-    data: { IG_CORP: igCorpData, HY_CORP: hyCorpData }
-  },
-  {
-    name: 'Equity Momentum',
-    description: 'Large cap stocks with different momentum profiles - test trend following strategies',
-    securities: ['MOMENTUM', 'VALUE'],
-    period: '2023',
-    dataType: 'Daily OHLCV',
-    useCase: 'Momentum strategies, factor rotation',
-    data: { MOMENTUM: momentumData, VALUE: valueData }
-  },
-  {
-    name: 'Sector Rotation',
-    description: 'Technology and utilities sector ETFs - test sector rotation logic',
-    securities: ['TECH', 'UTIL'],
-    period: '2023',
-    dataType: 'Daily prices',
-    useCase: 'Sector rotation, defensive vs growth allocation',
-    data: { TECH: techData, UTIL: utilData }
-  }
-]
-
-export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
-  const [config, setConfig] = useState<BacktestConfig>({
-    startCapital: 1000,
-    transactionCost: 0.003,
-    volumeCapPct: 0.25,
-    slippageModel: 'adaptive'
-  })
-
-  const [strategyCode, setStrategyCode] = useState(`// Z-score Mean Reversion Strategy
+    data: { PA: paData, PB: pbData },
+    strategyTemplate: `// Z-score Mean Reversion Strategy
 // Switches between PA and PB based on yield spread Z-score
 
 const LOOKBACK = 60
@@ -110,13 +75,125 @@ if (state.holding === null || state.holding === 'PA') {
   }
 }
 
-return { action: 'hold', reason: \`Z-score (\${Z.toFixed(2)}) within range\` }
-`)
+return { action: 'hold', reason: \`Z-score (\${Z.toFixed(2)}) within range\` }`
+  },
+  {
+    name: 'Corporate Bond Spread',
+    description: 'Investment grade vs high yield corporate bonds - test credit spread strategies and flight to quality',
+    securities: ['IG_CORP', 'HY_CORP'],
+    period: '2022-2023',
+    dataType: 'Daily prices + fundamentals',
+    useCase: 'Credit spread analysis, duration management',
+    category: 'fixed-income',
+    coupons: { IG_CORP: 4.25, HY_CORP: 6.75 },
+    data: { IG_CORP: igCorpData, HY_CORP: hyCorpData },
+    strategyTemplate: `// Credit Spread Strategy
+// Switch between IG and HY bonds based on spread levels
 
-  const [dataFiles, setDataFiles] = useState<Record<string, any>>({
-    PA: paData,
-    PB: pbData
+const SPREAD_THRESHOLD = 2.5  // percentage points
+const VOLATILITY_LOOKBACK = 20
+
+// Calculate yield spread
+const igYield = row.IG_CORP_Yield
+const hyYield = row.HY_CORP_Yield
+const spread = hyYield - igYield
+
+// Calculate spread volatility
+const spreadVol = df.rolling(VOLATILITY_LOOKBACK, 10).std('Spread')
+
+// Risk-off when spread widening, risk-on when spread tightening
+if (spread > SPREAD_THRESHOLD && spreadVol[index] > 0.5) {
+  return { action: 'buy', symbol: 'IG_CORP', reason: \`Spread (\${spread.toFixed(2)}%) above threshold, flight to quality\` }
+} else if (spread < 1.5 && spreadVol[index] < 0.3) {
+  return { action: 'buy', symbol: 'HY_CORP', reason: \`Spread (\${spread.toFixed(2)}%) compressed, risk-on\` }
+}
+
+return { action: 'hold', reason: \`Spread (\${spread.toFixed(2)}%) in neutral zone\` }`
+  },
+  {
+    name: 'Momentum vs Value Factor',
+    description: 'Large cap momentum stocks vs value stocks - test factor rotation and style timing strategies',
+    securities: ['MOMENTUM', 'VALUE'],
+    period: '2023',
+    dataType: 'Daily OHLCV',
+    useCase: 'Momentum strategies, factor rotation',
+    category: 'factor',
+    data: { MOMENTUM: momentumData, VALUE: valueData },
+    strategyTemplate: `// Factor Rotation Strategy
+// Rotate between momentum and value based on relative performance
+
+const LOOKBACK_SHORT = 20
+const LOOKBACK_LONG = 60
+const ROTATION_THRESHOLD = 0.02  // 2% outperformance
+
+// Calculate short-term and long-term relative performance
+const momReturn20 = (row.MOMENTUM_Close - df.getColumn('MOMENTUM_Close')[index - LOOKBACK_SHORT]) / df.getColumn('MOMENTUM_Close')[index - LOOKBACK_SHORT]
+const valReturn20 = (row.VALUE_Close - df.getColumn('VALUE_Close')[index - LOOKBACK_SHORT]) / df.getColumn('VALUE_Close')[index - LOOKBACK_SHORT]
+const relPerf = momReturn20 - valReturn20
+
+// Calculate trend strength
+const momMA = df.rolling(LOOKBACK_LONG, 20).mean('MOMENTUM_Close')
+const valMA = df.rolling(LOOKBACK_LONG, 20).mean('VALUE_Close')
+const momTrend = (row.MOMENTUM_Close - momMA[index]) / momMA[index]
+const valTrend = (row.VALUE_Close - valMA[index]) / valMA[index]
+
+// Rotate to stronger factor
+if (relPerf > ROTATION_THRESHOLD && momTrend > 0) {
+  return { action: 'buy', symbol: 'MOMENTUM', reason: \`Momentum outperforming by \${(relPerf*100).toFixed(2)}%\` }
+} else if (relPerf < -ROTATION_THRESHOLD && valTrend > 0) {
+  return { action: 'buy', symbol: 'VALUE', reason: \`Value outperforming by \${(Math.abs(relPerf)*100).toFixed(2)}%\` }
+}
+
+return { action: 'hold', reason: 'No clear factor advantage' }`
+  },
+  {
+    name: 'Sector Rotation (Tech/Utilities)',
+    description: 'Technology and utilities sector ETFs - test defensive vs growth allocation based on market regime',
+    securities: ['TECH', 'UTIL'],
+    period: '2023',
+    dataType: 'Daily prices',
+    useCase: 'Sector rotation, defensive vs growth allocation',
+    category: 'sector',
+    data: { TECH: techData, UTIL: utilData },
+    strategyTemplate: `// Sector Rotation Strategy
+// Rotate between growth (Tech) and defensive (Utilities) sectors
+
+const VOLATILITY_LOOKBACK = 30
+const HIGH_VOL_THRESHOLD = 0.015  // 1.5% daily vol
+const MOMENTUM_LOOKBACK = 60
+
+// Calculate market volatility (using TECH as proxy)
+const techReturns = df.getColumn('TECH_Close').map((p, i, arr) => i > 0 ? (p - arr[i-1]) / arr[i-1] : 0)
+const volatility = techReturns.slice(-VOLATILITY_LOOKBACK).reduce((sum, r) => sum + r*r, 0) / VOLATILITY_LOOKBACK
+const dailyVol = Math.sqrt(volatility)
+
+// Calculate relative momentum
+const techMom = (row.TECH_Close - df.getColumn('TECH_Close')[index - MOMENTUM_LOOKBACK]) / df.getColumn('TECH_Close')[index - MOMENTUM_LOOKBACK]
+const utilMom = (row.UTIL_Close - df.getColumn('UTIL_Close')[index - MOMENTUM_LOOKBACK]) / df.getColumn('UTIL_Close')[index - MOMENTUM_LOOKBACK]
+
+// High volatility = defensive, low volatility = growth
+if (dailyVol > HIGH_VOL_THRESHOLD) {
+  return { action: 'buy', symbol: 'UTIL', reason: \`High volatility (\${(dailyVol*100).toFixed(2)}%), defensive posture\` }
+} else if (dailyVol < 0.008 && techMom > utilMom) {
+  return { action: 'buy', symbol: 'TECH', reason: \`Low volatility (\${(dailyVol*100).toFixed(2)}%), growth posture\` }
+}
+
+return { action: 'hold', reason: \`Volatility (\${(dailyVol*100).toFixed(2)}%) in neutral range\` }`
+  }
+]
+
+export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
+  const [config, setConfig] = useState<BacktestConfig>({
+    startCapital: 1000,
+    transactionCost: 0.003,
+    volumeCapPct: 0.25,
+    slippageModel: 'adaptive'
   })
+
+  const [strategyCode, setStrategyCode] = useState(sampleDatasets[0].strategyTemplate)
+
+  const [dataFiles, setDataFiles] = useState<Record<string, any>>(sampleDatasets[0].data)
+  const [selectedDataset, setSelectedDataset] = useState<SampleDataset | null>(sampleDatasets[0])
   const [result, setResult] = useState<BacktestResult | null>(null)
   const [isRunning, setIsRunning] = useState(false)
   const [activeTab, setActiveTab] = useState('config')
@@ -246,36 +323,90 @@ return { action: 'hold', reason: \`Z-score (\${Z.toFixed(2)}) within range\` }
                   Example Datasets
                 </Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {sampleDatasets.map((dataset, idx) => (
-                    <div
-                      key={idx}
-                      className="border rounded-lg p-4 space-y-2 hover:border-accent/50 transition-colors cursor-pointer"
-                      onClick={() => {
-                        setDataFiles(dataset.data)
-                        toast.success(`Loaded ${dataset.name}`)
-                      }}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{dataset.name}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{dataset.description}</p>
+                  {sampleDatasets.map((dataset, idx) => {
+                    const isSelected = selectedDataset?.name === dataset.name
+                    return (
+                      <div
+                        key={idx}
+                        className={cn(
+                          "border rounded-lg p-4 space-y-2 hover:border-accent/50 transition-colors cursor-pointer",
+                          isSelected && "border-accent bg-accent/5"
+                        )}
+                        onClick={() => {
+                          setDataFiles(dataset.data)
+                          setStrategyCode(dataset.strategyTemplate)
+                          setSelectedDataset(dataset)
+                          toast.success(`Loaded ${dataset.name}`)
+                        }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-sm">{dataset.name}</p>
+                              {isSelected && (
+                                <Badge variant="default" className="text-[9px] h-4 px-1">
+                                  ACTIVE
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">{dataset.description}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {dataset.securities.map(sec => (
+                            <Badge key={sec} variant="secondary" className="text-[10px] h-5">
+                              {sec}
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-0.5 mt-2">
+                          <div>Period: {dataset.period}</div>
+                          <div>Use case: {dataset.useCase}</div>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {dataset.securities.map(sec => (
-                          <Badge key={sec} variant="secondary" className="text-[10px] h-5">
-                            {sec}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="text-xs text-muted-foreground space-y-0.5 mt-2">
-                        <div>Period: {dataset.period}</div>
-                        <div>Use case: {dataset.useCase}</div>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
+
+              {selectedDataset && (
+                <div className="border-t pt-4">
+                  <Label className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <TableIcon size={16} />
+                    Active Dataset Summary
+                  </Label>
+                  <div className="bg-muted/30 rounded-lg p-3 space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                      <div className="text-muted-foreground">Name:</div>
+                      <div className="font-medium">{selectedDataset.name}</div>
+                      
+                      <div className="text-muted-foreground">Category:</div>
+                      <div>
+                        <Badge variant="outline" className="text-[10px] h-5">
+                          {selectedDataset.category}
+                        </Badge>
+                      </div>
+                      
+                      <div className="text-muted-foreground">Securities:</div>
+                      <div className="font-mono text-xs">{selectedDataset.securities.join(', ')}</div>
+                      
+                      <div className="text-muted-foreground">Period:</div>
+                      <div>{selectedDataset.period}</div>
+                      
+                      {selectedDataset.coupons && (
+                        <>
+                          <div className="text-muted-foreground">Coupons:</div>
+                          <div className="font-mono text-xs">
+                            {Object.entries(selectedDataset.coupons).map(([sec, rate]) => 
+                              `${sec}: $${rate}`
+                            ).join(', ')}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="border-t pt-4">
                 <Label className="text-base">Custom Upload</Label>
