@@ -26,6 +26,9 @@ import utilData from '@/assets/data/util-sector.json'
 
 interface BacktestBuilderProps {
   onRun: (config: BacktestConfig, strategyCode: string, dataFiles: Record<string, any>) => Promise<BacktestResult>
+  quickStartRequest?: number
+  compactDefault?: boolean
+  onSummary?: (summary: { finalValue: number; cagr: number; trades: number; error?: string }) => void
 }
 
 interface SampleDataset {
@@ -201,7 +204,7 @@ return { action: 'hold', reason: \`Tech/Util ratio \${techUtilRatio.toFixed(2)} 
   }
 ]
 
-export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
+export function BacktestBuilder({ onRun, quickStartRequest = 0, compactDefault = true, onSummary }: BacktestBuilderProps) {
   const [config, setConfig] = useState<BacktestConfig>({
     startCapital: 1000,
     transactionCost: 0.003,
@@ -216,6 +219,8 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
   const [result, setResult] = useState<BacktestResult | null>(null)
   const [isRunning, setIsRunning] = useState(false)
   const [activeTab, setActiveTab] = useState('config')
+  const [showAdvanced, setShowAdvanced] = useState(!compactDefault)
+  const [runError, setRunError] = useState<string | null>(null)
 
   const handleFileUpload = async (symbol: string, file: File) => {
     try {
@@ -230,25 +235,63 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
 
   const handleRun = async () => {
     setIsRunning(true)
+    setRunError(null)
     try {
       const backtestResult = await onRun(config, strategyCode, dataFiles)
       setResult(backtestResult)
       setActiveTab('results')
+      onSummary?.({
+        finalValue: backtestResult.metrics.Final,
+        cagr: backtestResult.metrics.CAGR,
+        trades: backtestResult.trades.length,
+      })
       toast.success('Backtest complete')
     } catch (error) {
-      toast.error(`Backtest failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      setRunError(message)
+      onSummary?.({
+        finalValue: 0,
+        cagr: 0,
+        trades: 0,
+        error: message,
+      })
+      toast.error(`Backtest failed: ${message}`)
     } finally {
       setIsRunning(false)
     }
   }
 
   useEffect(() => {
+    if (!compactDefault) return
     const autoRun = async () => {
       await new Promise(resolve => setTimeout(resolve, 500))
       await handleRun()
     }
-    autoRun()
+    void autoRun()
   }, [])
+
+  useEffect(() => {
+    if (quickStartRequest <= 0) return
+    const starter = sampleDatasets[0]
+    setSelectedDataset(starter)
+    setDataFiles(starter.data)
+    setStrategyCode(starter.strategyTemplate)
+    setShowAdvanced(false)
+    setActiveTab('results')
+    void handleRun()
+  }, [quickStartRequest])
+
+  const errorRecovery = (() => {
+    if (!runError) return null
+    const lowered = runError.toLowerCase()
+    if (lowered.includes('json') || lowered.includes('column') || lowered.includes('data')) {
+      return { type: 'data', recommendation: 'Check dataset shape and required columns in Data Sources.', targetTab: 'data' }
+    }
+    if (lowered.includes('syntax') || lowered.includes('unexpected') || lowered.includes('referenceerror')) {
+      return { type: 'code', recommendation: 'Fix strategy code syntax/variables in Strategy Code.', targetTab: 'strategy' }
+    }
+    return { type: 'config', recommendation: 'Validate numeric inputs and slippage settings in Configuration.', targetTab: 'config' }
+  })()
 
   return (
     <div className="space-y-4">
@@ -263,6 +306,88 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
         </Button>
       </div>
 
+      <Card className="border-accent/30 bg-accent/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkle size={18} className="text-accent" />
+            Quick Backtest
+          </CardTitle>
+          <CardDescription>
+            Minimal inputs for first value. Use “More settings” for full advanced controls.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label>Dataset</Label>
+              <Select
+                value={selectedDataset?.name}
+                onValueChange={(value) => {
+                  const dataset = sampleDatasets.find((item) => item.name === value)
+                  if (!dataset) return
+                  setSelectedDataset(dataset)
+                  setDataFiles(dataset.data)
+                  setStrategyCode(dataset.strategyTemplate)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select dataset" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sampleDatasets.map((dataset) => (
+                    <SelectItem key={dataset.name} value={dataset.name}>
+                      {dataset.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Starting Capital</Label>
+              <Input
+                type="number"
+                value={config.startCapital}
+                onChange={(e) => setConfig(c => ({ ...c, startCapital: parseFloat(e.target.value) || 0 }))}
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <Button onClick={handleRun} disabled={isRunning} className="w-full">
+                <PlayCircle size={18} className="mr-2" weight="fill" />
+                {isRunning ? 'Running...' : 'Quick Run'}
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowAdvanced((current) => !current)}>
+              {showAdvanced ? 'Hide settings' : 'More settings'}
+            </Button>
+            {result && (
+              <Badge variant="secondary">
+                Final ${result.metrics.Final.toFixed(2)} · CAGR {result.metrics.CAGR.toFixed(2)}%
+              </Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {errorRecovery && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="pt-4">
+            <div className="text-sm font-medium text-destructive">Backtest failed ({errorRecovery.type})</div>
+            <p className="text-sm text-muted-foreground mt-1">{errorRecovery.recommendation}</p>
+            <div className="mt-3 flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setActiveTab(errorRecovery.targetTab)}>
+                Open {errorRecovery.targetTab}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setRunError(null)}>
+                Dismiss
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {showAdvanced && (
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="config">Configuration</TabsTrigger>
@@ -701,6 +826,7 @@ const price = data.PA_Close`}</pre>
           )}
         </TabsContent>
       </Tabs>
+      )}
     </div>
   )
 }
