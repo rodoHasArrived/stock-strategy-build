@@ -12,6 +12,16 @@ import "./main.css"
 import "./styles/theme.css"
 import "./index.css"
 
+const resizeObserverErrorHandler = (e: ErrorEvent) => {
+  if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
+    e.stopImmediatePropagation()
+    return false
+  }
+  return true
+}
+
+window.addEventListener('error', resizeObserverErrorHandler)
+
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary FallbackComponent={ErrorFallback}>
     <App />
