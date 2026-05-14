@@ -219,3 +219,73 @@ export interface CellComment {
   parentId?: string
   resolved?: boolean
 }
+
+export interface BacktestConfig {
+  startCapital: number
+  startDate?: Date
+  endDate?: Date
+  transactionCost: number
+  volumeCapPct: number
+  slippageModel: 'fixed' | 'adaptive' | 'custom'
+  customSlippageFn?: string
+}
+
+export interface BacktestPosition {
+  symbol: string
+  shares: number
+  entryPrice: number
+  entryDate: Date
+}
+
+export interface BacktestTrade {
+  date: Date
+  symbol: string
+  action: 'buy' | 'sell'
+  shares: number
+  price: number
+  executionPrice: number
+  slippage: number
+  commission: number
+  reason: string
+}
+
+export interface BacktestMetrics {
+  CAGR: number
+  Sharpe: number
+  Sortino: number
+  Calmar: number
+  MaxDD: number
+  Vol: number
+  Trades_Yr: number
+  Final: number
+  Years: number
+  totalReturn: number
+}
+
+export interface BacktestResult {
+  equity: Array<{ date: Date; value: number; holding?: string; [key: string]: any }>
+  trades: BacktestTrade[]
+  metrics: BacktestMetrics
+  positions: BacktestPosition[]
+}
+
+export interface TimeSeriesData {
+  symbol: string
+  data: Array<{
+    date: Date
+    open?: number
+    high?: number
+    low?: number
+    close: number
+    volume?: number
+    [key: string]: any
+  }>
+}
+
+export interface StrategySignal {
+  date: Date
+  action: 'buy' | 'sell' | 'hold'
+  symbol?: string
+  reason?: string
+  [key: string]: any
+}

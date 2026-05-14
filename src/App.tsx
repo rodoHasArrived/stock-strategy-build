@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CodeCell, Parameter, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate } from '@/lib/types'
+import { CodeCell, Parameter, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate, BacktestConfig, BacktestResult } from '@/lib/types'
 import { CodeCellComponent } from '@/components/CodeCellComponent'
 import { ParameterPanel } from '@/components/ParameterPanel'
 import { ContextInspector } from '@/components/ContextInspector'
@@ -15,15 +15,18 @@ import { TradeList } from '@/components/TradeList'
 import { TimeSeriesTools } from '@/components/TimeSeriesTools'
 import { CellComments } from '@/components/CellComments'
 import { TemplateGallery } from '@/components/TemplateGallery'
+import { BacktestBuilder } from '@/components/BacktestBuilder'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { FloppyDisk, Code, Plus, PlayCircle, FlowArrow, Database, Calculator, SidebarSimple } from '@phosphor-icons/react'
+import { FloppyDisk, Code, Plus, PlayCircle, FlowArrow, Database, Calculator, SidebarSimple, ChartLine } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
+import { BacktestEngine } from '@/lib/backtestEngine'
+import { DataFrame, readJSON, toDatetime, toNumeric } from '@/lib/dataFrame'
 
 const createDefaultCell = (index: number, code: string = ''): CodeCell => ({
   id: `cell-${index}`,
@@ -364,6 +367,38 @@ function App() {
     toast.success(`Loaded template: ${template.name}`)
   }
 
+  const handleBacktestRun = async (
+    config: BacktestConfig,
+    strategyCode: string,
+    dataFiles: Record<string, any>
+  ): Promise<BacktestResult> => {
+    const engine = new BacktestEngine(config)
+
+    Object.entries(dataFiles).forEach(([symbol, data]) => {
+      const df = readJSON(data)
+      const dateCol = df.columns.includes('SessionDate') ? 'SessionDate' : 'Date'
+      const dates = toDatetime(df.getColumn(dateCol))
+      const closes = toNumeric(df.getColumn('Close'))
+      const volumes = toNumeric(df.getColumn('Volume'))
+
+      const timeSeriesData = dates.map((date, i) => ({
+        date,
+        close: closes[i],
+        volume: volumes[i]
+      }))
+
+      engine.loadTimeSeries(symbol, timeSeriesData)
+    })
+
+    const strategyFn = new Function('df', 'state', 'DataFrame', 'readJSON', 'toDatetime', 'toNumeric', strategyCode)
+
+    const result = await engine.runBacktest((df, state) => {
+      return strategyFn(df, state, DataFrame, readJSON, toDatetime, toNumeric)
+    })
+
+    return result
+  }
+
   return (
     <div className="min-h-screen bg-background flex">
       <Toaster />
@@ -532,6 +567,10 @@ function App() {
                         <FlowArrow size={16} />
                         Execution Flow
                       </TabsTrigger>
+                      <TabsTrigger value="backtest" className="gap-2">
+                        <ChartLine size={16} />
+                        Backtest
+                      </TabsTrigger>
                     </TabsList>
                     <Button onClick={handleAddCell} size="sm" variant="outline">
                       <Plus size={16} className="mr-2" />
@@ -587,6 +626,10 @@ function App() {
                       }}
                       highlightedCell={highlightedCell}
                     />
+                  </TabsContent>
+
+                  <TabsContent value="backtest" className="mt-0">
+                    <BacktestBuilder onRun={handleBacktestRun} />
                   </TabsContent>
                 </Tabs>
               </div>

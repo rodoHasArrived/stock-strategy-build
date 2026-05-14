@@ -96,6 +96,13 @@ A comprehensive cell-based investment strategy builder that enables users to cre
 - **Progression**: Type "current_yield = " → System detects context → Autocomplete suggestions appear showing multiple formula options (annual_coupon / market_price, face_value * coupon_rate / clean_price, COUPON(cusip) / PRICE(cusip)) → User navigates with ↑↓ keys → Press Enter/Tab to insert suggestion → Formula auto-completes
 - **Success criteria**: Suggestions appear within 50ms of typing, arrow key navigation works smoothly, Enter/Tab inserts formula, Esc dismisses, suggestions contextually relevant to variable name, supports common patterns (yields, returns, spreads, durations)
 
+### Python-Style Backtesting Engine
+- **Functionality**: Full-featured backtesting environment with pandas-like DataFrame operations, JSON data loading, rolling window calculations, and comprehensive performance metrics (CAGR, Sharpe, Sortino, Calmar, MaxDD)
+- **Purpose**: Enable quantitative traders to validate strategies using Python-style syntax with realistic slippage models, transaction costs, and volume constraints before live deployment
+- **Trigger**: User clicks Backtest tab in main navigation
+- **Progression**: Upload JSON price/volume data → Configure backtest parameters (starting capital, transaction costs, volume cap %, slippage model) → Write Python-style strategy code using DataFrame API (merge, rolling, ffill, pctChange) → Define trading signals (buy/sell/hold with reasons) → Click Run Backtest → View equity curve, trade history, and performance metrics → Export results
+- **Success criteria**: Sub-second execution for 250+ day backtests, accurate implementation of adaptive slippage based on ADV, comprehensive metrics dashboard with visual feedback, trade-by-trade breakdown with execution prices, support for dividend reinvestment, realistic partial fill simulation based on volume caps
+
 ### Visual Condition Builder
 - **Functionality**: Drag-and-drop interface for building complex conditional logic without writing code, now integrated with Field Picker
 - **Purpose**: Allow non-technical users to create sophisticated filters and decision rules visually
