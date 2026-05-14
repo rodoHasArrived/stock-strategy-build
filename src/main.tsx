@@ -33,6 +33,14 @@ console.error = (...args: any[]) => {
   originalConsoleError.apply(console, args)
 }
 
+const resizeObserverLoopErrRe = /^[^(ResizeObserver loop limit exceeded)]/
+window.addEventListener('error', (e: ErrorEvent) => {
+  if (!resizeObserverLoopErrRe.test(e.message)) {
+    e.stopImmediatePropagation()
+    e.preventDefault()
+  }
+})
+
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary FallbackComponent={ErrorFallback}>
     <App />

@@ -34,7 +34,7 @@ interface FlowDiagramProps {
 
 type FlowEdgeKind = 'sequential' | 'conditional' | 'goto' | 'loop'
 
-interface FlowNodeData {
+interface FlowNodeData extends Record<string, unknown> {
   cell: CodeCell
   isHighlighted: boolean
   onCellClick?: (index: number) => void

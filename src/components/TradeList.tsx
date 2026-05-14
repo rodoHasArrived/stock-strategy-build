@@ -93,7 +93,7 @@ export function TradeList({ trades, onExport }: TradeListProps) {
       headerName: 'Security',
       minWidth: 220,
       flex: 1.3,
-      cellRenderer: ({ data }) => (
+      cellRenderer: ({ data }: { data?: Trade }) => (
         <div className="py-2">
           <div className="font-mono text-sm font-medium text-foreground">{data?.security}</div>
           <div className="text-xs text-muted-foreground">{data?.cusip}</div>
@@ -105,7 +105,7 @@ export function TradeList({ trades, onExport }: TradeListProps) {
       headerName: 'Action',
       minWidth: 140,
       maxWidth: 160,
-      cellRenderer: ({ value }) => value ? (
+      cellRenderer: ({ value }: { value?: TradeAction }) => value ? (
         <Badge variant="outline" className={cn('font-medium', actionColors[value])}>
           <span className="mr-1.5">{actionIcons[value]}</span>
           {value.toUpperCase()}
@@ -118,7 +118,7 @@ export function TradeList({ trades, onExport }: TradeListProps) {
       minWidth: 140,
       maxWidth: 170,
       type: 'numericColumn',
-      valueFormatter: ({ value }) => value !== undefined ? formatCurrency(value) : '—',
+      valueFormatter: ({ value }: { value?: number }) => value !== undefined ? formatCurrency(value) : '—',
       cellClass: 'font-mono',
     },
     {
@@ -127,7 +127,7 @@ export function TradeList({ trades, onExport }: TradeListProps) {
       minWidth: 100,
       maxWidth: 120,
       type: 'numericColumn',
-      valueFormatter: ({ value }) => value !== undefined ? formatPrice(value) : '—',
+      valueFormatter: ({ value }: { value?: number }) => value !== undefined ? formatPrice(value) : '—',
       cellClass: 'font-mono',
     },
     {
@@ -136,7 +136,7 @@ export function TradeList({ trades, onExport }: TradeListProps) {
       minWidth: 110,
       maxWidth: 130,
       type: 'numericColumn',
-      cellRenderer: ({ value }) => {
+      cellRenderer: ({ value }: { value?: number }) => {
         if (value === undefined) return '—'
         const scoreColor = value >= 70 ? 'text-success' : value >= 40 ? 'text-warning' : 'text-destructive'
         return <span className={cn('font-mono font-semibold', scoreColor)}>{value.toFixed(1)}</span>
@@ -147,7 +147,7 @@ export function TradeList({ trades, onExport }: TradeListProps) {
       headerName: 'Reason',
       minWidth: 240,
       flex: 1.4,
-      cellRenderer: ({ data }) => (
+      cellRenderer: ({ data }: { data?: Trade }) => (
         <div className="py-2">
           <div className="text-sm font-medium text-foreground">{data ? reasonLabels[data.reason] || data.reason : '—'}</div>
           {data?.reasonDetails && (
