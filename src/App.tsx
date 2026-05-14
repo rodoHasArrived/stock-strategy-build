@@ -280,16 +280,22 @@ function App() {
     toast.success('Strategy saved successfully')
   }
 
-  if (!strategy || !Array.isArray(strategy.cells)) {
-    return null
-  }
+  useEffect(() => {
+    if (!strategy || !Array.isArray(strategy.cells)) {
+      setStrategy(createDefaultStrategy())
+    }
+  }, [strategy, setStrategy])
+
+  const safeStrategy = (!strategy || !Array.isArray(strategy.cells)) 
+    ? createDefaultStrategy() 
+    : strategy
 
   const handleFieldSelect = (field: AMXDataField) => {
     toast.info(`Field selected: ${field.function}(cusip)`)
   }
 
   const handleYieldFormulaGenerate = (formula: string) => {
-    const newIndex = strategy.cells.length
+    const newIndex = safeStrategy.cells.length
     const newCell: CodeCell = createDefaultCell(newIndex, formula)
     setStrategy((current) => {
       if (!current || !Array.isArray(current.cells)) {
@@ -306,7 +312,7 @@ function App() {
 
   const handleTimeSeriesGenerate = (config: TimeSeriesConfig) => {
     const formula = `${config.calculation}(${config.field}, ${config.window})`
-    const newIndex = strategy.cells.length
+    const newIndex = safeStrategy.cells.length
     const newCell: CodeCell = createDefaultCell(newIndex, formula)
     setStrategy((current) => {
       if (!current || !Array.isArray(current.cells)) {
@@ -475,7 +481,7 @@ function App() {
                 <h1 className="text-xl font-semibold tracking-tight">Strategy Executor</h1>
               </div>
               <Input
-                value={strategy.name}
+                value={safeStrategy.name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 className="w-64 h-9 bg-background hidden md:block"
                 placeholder="Strategy name"
@@ -520,7 +526,7 @@ function App() {
                   <TabsContent value="cells" className="mt-0">
                     <ScrollArea className="h-[calc(100vh-240px)]">
                       <div className="space-y-4 pr-4">
-                        {strategy.cells.map((cell, index) => (
+                        {safeStrategy.cells.map((cell, index) => (
                           <div key={cell.id} className="space-y-2">
                             <CodeCellComponent
                               cell={cell}
@@ -535,7 +541,7 @@ function App() {
                               currentUser={currentUser}
                             />
                             
-                            {index < strategy.cells.length - 1 && (
+                            {index < safeStrategy.cells.length - 1 && (
                               <TransitionEditor
                                 fromCell={cell.index}
                                 toCell={cell.index + 1}
@@ -543,7 +549,7 @@ function App() {
                                 onRulesChange={(rules) => {
                                   console.log('Transition rules updated:', rules)
                                 }}
-                                cellCount={strategy.cells.length}
+                                cellCount={safeStrategy.cells.length}
                               />
                             )}
                           </div>
@@ -554,7 +560,7 @@ function App() {
 
                   <TabsContent value="flow" className="mt-0">
                     <FlowDiagram
-                      cells={strategy.cells}
+                      cells={safeStrategy.cells}
                       onCellClick={(index) => {
                         setHighlightedCell(index)
                         setActiveTab('cells')
@@ -572,7 +578,7 @@ function App() {
               <div className="lg:col-span-1 space-y-4">
                 <ContextInspector context={executionContext} />
                 <ParameterPanel
-                  parameters={Array.isArray(strategy.parameters) ? strategy.parameters : []}
+                  parameters={Array.isArray(safeStrategy.parameters) ? safeStrategy.parameters : []}
                   onParametersChange={handleParametersChange}
                 />
               </div>
