@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CodeCell, Parameter, RunTraceEntry, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate, BacktestConfig, BacktestResult } from '@/lib/types'
+import { CodeCell, Parameter, RunTraceEntry, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate, BacktestConfig, BacktestResult, TransitionRule, GovernanceConfig } from '@/lib/types'
 import { CodeCellComponent } from '@/components/CodeCellComponent'
 import { ParameterPanel } from '@/components/ParameterPanel'
 import { ContextInspector } from '@/components/ContextInspector'
@@ -16,6 +16,8 @@ import { TimeSeriesTools } from '@/components/TimeSeriesTools'
 import { CellComments } from '@/components/CellComments'
 import { TemplateGallery } from '@/components/TemplateGallery'
 import { BacktestBuilder } from '@/components/BacktestBuilder'
+import { RunTraceViewer } from '@/components/RunTraceViewer'
+import { GovernancePanel } from '@/components/GovernancePanel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -23,14 +25,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
-import { FloppyDisk, Code, Plus, PlayCircle, FlowArrow, Database, Calculator, SidebarSimple, ChartLine, DownloadSimple } from '@phosphor-icons/react'
+import { FloppyDisk, Code, Plus, PlayCircle, FlowArrow, Database, Calculator, SidebarSimple, ChartLine, DownloadSimple, Columns, Shield } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { BacktestEngine } from '@/lib/backtestEngine'
 import { DataFrame, readJSON, toDatetime, toNumeric } from '@/lib/dataFrame'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { cn } from '@/lib/utils'
-import { saveStrategyExternal, loadStrategyExternal, saveRunLog, downloadJSON } from '@/lib/persistence'
+import { saveStrategyExternal, saveRunLog, downloadJSON } from '@/lib/persistence'
 
 type ActiveInsertionTarget = {
   cellIndex: number
@@ -47,12 +49,20 @@ const createDefaultCell = (index: number, code: string = ''): CodeCell => ({
   purpose: 'general'
 })
 
+const createDefaultGovernance = (): GovernanceConfig => ({
+  reviewStatus: 'draft',
+  version: 1,
+  auditLog: [],
+})
+
 const createDefaultStrategy = (): Strategy => ({
   id: 'default',
   name: 'New Strategy',
   description: '',
   cells: [createDefaultCell(0)],
   parameters: [],
+  transitions: {},
+  governance: createDefaultGovernance(),
   createdAt: Date.now(),
   updatedAt: Date.now()
 })
@@ -80,7 +90,9 @@ function App() {
   const [highlightedCell, setHighlightedCell] = useState<number | undefined>(undefined)
   const [activeTab, setActiveTab] = useState<string>('backtest')
   const [leftPanelTab, setLeftPanelTab] = useState<'data' | 'tools'>('data')
-  const [selectedCellForTransition, setSelectedCellForTransition] = useState<number | undefined>(undefined)
+  const [rightPanelTab, setRightPanelTab] = useState<'inspector' | 'trace' | 'governance'>('inspector')
+  /** 'notebook' = cells only, 'map' = flow only, 'split' = side-by-side */
+  const [viewMode, setViewMode] = useState<'notebook' | 'map' | 'split'>('notebook')
   const [activeInsertionTarget, setActiveInsertionTarget] = useState<ActiveInsertionTarget>({
     cellIndex: 0,
     mode: 'formula'
@@ -315,6 +327,8 @@ function App() {
     } else {
       toast.success('Execution complete')
     }
+    // Auto-switch right panel to trace tab so users immediately see results
+    setRightPanelTab('trace')
   }
 
   const handleParametersChange = (parameters: Parameter[]) => {
@@ -329,6 +343,26 @@ function App() {
         parameters,
         updatedAt: Date.now()
       }
+    })
+  }
+
+  const handleTransitionsChange = (fromCell: number, rules: TransitionRule[]) => {
+    setStrategy((current) => {
+      if (!current) return createDefaultStrategy()
+      const transitions = { ...(current.transitions ?? {}) }
+      if (rules.length === 0) {
+        delete transitions[fromCell]
+      } else {
+        transitions[fromCell] = rules
+      }
+      return { ...current, transitions, updatedAt: Date.now() }
+    })
+  }
+
+  const handleGovernanceChange = (governance: GovernanceConfig) => {
+    setStrategy((current) => {
+      if (!current) return createDefaultStrategy()
+      return { ...current, governance, updatedAt: Date.now() }
     })
   }
 
@@ -374,7 +408,11 @@ function App() {
 
   const safeStrategy = (!strategy || !Array.isArray(strategy.cells)) 
     ? createDefaultStrategy() 
-    : strategy
+    : {
+        ...strategy,
+        transitions: strategy.transitions ?? {},
+        governance: strategy.governance ?? createDefaultGovernance(),
+      }
 
   useEffect(() => {
     if (activeInsertionTarget.cellIndex < safeStrategy.cells.length) return
@@ -776,128 +814,262 @@ function App() {
             <div className="container mx-auto p-6 h-full">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
                 <div className="lg:col-span-3 flex flex-col min-h-0">
-                  <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
-                    <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                  {/* Main view controls: tabs for backtest, view-mode toggle for cells/flow */}
+                  <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
                       <TabsList className="h-10">
-                        <TabsTrigger value="cells" className="gap-2 text-sm">
+                        <TabsTrigger value="cells" className="gap-2 text-sm" onClick={() => viewMode === 'map' && setViewMode('notebook')}>
                           <Code size={16} />
                           Code Cells
-                        </TabsTrigger>
-                        <TabsTrigger value="flow" className="gap-2 text-sm">
-                          <FlowArrow size={16} />
-                          Execution Flow
                         </TabsTrigger>
                         <TabsTrigger value="backtest" className="gap-2 text-sm">
                           <ChartLine size={16} />
                           Backtest
                         </TabsTrigger>
                       </TabsList>
-                      <Button onClick={handleAddCell} size="default" variant="outline">
-                        <Plus size={18} className="mr-2" />
-                        <span className="text-sm">Add Cell</span>
-                      </Button>
-                    </div>
+                    </Tabs>
 
-                    <TabsContent value="cells" className="mt-0 flex-1 min-h-0 overflow-hidden">
-                      <DragDropContext onDragEnd={handleDragEnd}>
-                        <ScrollArea className="h-full pr-2">
-                          <Droppable droppableId="cells-list">
-                            {(provided) => (
-                              <div
-                                {...provided.droppableProps}
-                                ref={provided.innerRef}
-                                className="space-y-4"
-                              >
-                                {safeStrategy.cells.map((cell, index) => (
-                                  <Draggable key={cell.id} draggableId={cell.id} index={index}>
-                                    {(provided, snapshot) => (
-                                      <div
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        className="space-y-2"
-                                      >
-                                        <div
-                                          className={cn(
-                                            "transition-shadow",
-                                            snapshot.isDragging && "shadow-lg"
+                    {activeTab === 'cells' && (
+                      <div className="flex items-center gap-1 border border-border rounded-lg p-0.5">
+                        <Button
+                          size="sm"
+                          variant={viewMode === 'notebook' ? 'secondary' : 'ghost'}
+                          className="h-8 px-2.5 text-xs gap-1.5"
+                          onClick={() => setViewMode('notebook')}
+                          title="Notebook view"
+                        >
+                          <Code size={14} />
+                          <span className="hidden sm:inline">Notebook</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={viewMode === 'split' ? 'secondary' : 'ghost'}
+                          className="h-8 px-2.5 text-xs gap-1.5"
+                          onClick={() => setViewMode('split')}
+                          title="Split view: notebook + map"
+                        >
+                          <Columns size={14} />
+                          <span className="hidden sm:inline">Split</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={viewMode === 'map' ? 'secondary' : 'ghost'}
+                          className="h-8 px-2.5 text-xs gap-1.5"
+                          onClick={() => setViewMode('map')}
+                          title="Map view"
+                        >
+                          <FlowArrow size={14} />
+                          <span className="hidden sm:inline">Map</span>
+                        </Button>
+                      </div>
+                    )}
+
+                    <Button onClick={handleAddCell} size="default" variant="outline">
+                      <Plus size={18} className="mr-2" />
+                      <span className="text-sm">Add Cell</span>
+                    </Button>
+                  </div>
+
+                  {/* Cells / Backtest content */}
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    {activeTab === 'backtest' ? (
+                      <ScrollArea className="h-full">
+                        <BacktestBuilder onRun={handleBacktestRun} />
+                      </ScrollArea>
+                    ) : (
+                      /* Cells view with optional split pane */
+                      <div className={cn("h-full", viewMode === 'split' ? "flex gap-4" : "")}>
+                        {/* Notebook pane */}
+                        {(viewMode === 'notebook' || viewMode === 'split') && (
+                          <div className={cn("flex flex-col min-h-0", viewMode === 'split' ? "flex-1 min-w-0" : "h-full")}>
+                            <DragDropContext onDragEnd={handleDragEnd}>
+                              <ScrollArea className="h-full pr-2">
+                                <Droppable droppableId="cells-list">
+                                  {(provided) => (
+                                    <div
+                                      {...provided.droppableProps}
+                                      ref={provided.innerRef}
+                                      className="space-y-4"
+                                    >
+                                      {safeStrategy.cells.map((cell, index) => (
+                                        <Draggable key={cell.id} draggableId={cell.id} index={index}>
+                                          {(provided, snapshot) => (
+                                            <div
+                                              ref={provided.innerRef}
+                                              {...provided.draggableProps}
+                                              className="space-y-2"
+                                            >
+                                              <div
+                                                className={cn(
+                                                  "transition-shadow",
+                                                  snapshot.isDragging && "shadow-lg"
+                                                )}
+                                              >
+                                                <CodeCellComponent
+                                                  cell={cell}
+                                                  onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
+                                                  onCellChange={(updates) => handleCellChange(cell.index, updates)}
+                                                  onRun={() => handleRunCell(cell.index)}
+                                                  onDelete={() => handleDeleteCell(cell.index)}
+                                                  onDuplicate={() => handleDuplicateCell(cell.index)}
+                                                  comments={cellComments}
+                                                  onAddComment={handleAddComment}
+                                                  onDeleteComment={handleDeleteComment}
+                                                  onResolveComment={handleResolveComment}
+                                                  currentUser={currentUser}
+                                                  dragHandleProps={provided.dragHandleProps}
+                                                  onActivate={(mode) => handleActivateCell(cell.index, mode)}
+                                                  isActive={activeInsertionTarget.cellIndex === cell.index}
+                                                />
+                                              </div>
+
+                                              {index < safeStrategy.cells.length - 1 && (
+                                                <TransitionEditor
+                                                  fromCell={cell.index}
+                                                  toCell={cell.index + 1}
+                                                  rules={safeStrategy.transitions[cell.index] ?? []}
+                                                  onRulesChange={(rules) => handleTransitionsChange(cell.index, rules)}
+                                                  cellCount={safeStrategy.cells.length}
+                                                />
+                                              )}
+                                            </div>
                                           )}
-                                        >
-                                          <CodeCellComponent
-                                            cell={cell}
-                                            onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
-                                            onCellChange={(updates) => handleCellChange(cell.index, updates)}
-                                            onRun={() => handleRunCell(cell.index)}
-                                            onDelete={() => handleDeleteCell(cell.index)}
-                                            onDuplicate={() => handleDuplicateCell(cell.index)}
-                                            comments={cellComments}
-                                            onAddComment={handleAddComment}
-                                            onDeleteComment={handleDeleteComment}
-                                            onResolveComment={handleResolveComment}
-                                            currentUser={currentUser}
-                                            dragHandleProps={provided.dragHandleProps}
-                                            onActivate={(mode) => handleActivateCell(cell.index, mode)}
-                                            isActive={activeInsertionTarget.cellIndex === cell.index}
-                                          />
-                                        </div>
-                                        
-                                        {index < safeStrategy.cells.length - 1 && (
-                                          <TransitionEditor
-                                            fromCell={cell.index}
-                                            toCell={cell.index + 1}
-                                            rules={[]}
-                                            onRulesChange={(rules) => {
-                                              console.log('Transition rules updated:', rules)
-                                            }}
-                                            cellCount={safeStrategy.cells.length}
-                                          />
-                                        )}
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                ))}
-                                {provided.placeholder}
-                              </div>
+                                        </Draggable>
+                                      ))}
+                                      {provided.placeholder}
+                                    </div>
+                                  )}
+                                </Droppable>
+                              </ScrollArea>
+                            </DragDropContext>
+                          </div>
+                        )}
+
+                        {/* Map pane */}
+                        {(viewMode === 'map' || viewMode === 'split') && (
+                          <div className={cn("flex flex-col min-h-0", viewMode === 'split' ? "flex-1 min-w-0 border-l border-border pl-4" : "h-full")}>
+                            {viewMode === 'split' && (
+                              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5 flex-shrink-0">
+                                <FlowArrow size={13} />
+                                Execution map — click a node to scroll to its cell
+                              </p>
                             )}
-                          </Droppable>
-                        </ScrollArea>
-                      </DragDropContext>
+                            <div className="flex-1 min-h-0">
+                              <FlowDiagram
+                                cells={safeStrategy.cells}
+                                onCellClick={(index) => {
+                                  setHighlightedCell(index)
+                                  if (viewMode !== 'map') {
+                                    setTimeout(() => {
+                                      const element = document.getElementById(`cell-${index}`)
+                                      element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                    }, 100)
+                                  }
+                                }}
+                                highlightedCell={highlightedCell}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right panel with tabbed sections */}
+                <div className="lg:col-span-1 flex flex-col gap-0 min-h-0">
+                  <Tabs value={rightPanelTab} onValueChange={(v) => setRightPanelTab(v as typeof rightPanelTab)} className="flex flex-col flex-1 min-h-0">
+                    <TabsList className="w-full grid grid-cols-3 h-9 mb-3 flex-shrink-0">
+                      <TabsTrigger value="inspector" className="text-xs gap-1">
+                        Inspector
+                      </TabsTrigger>
+                      <TabsTrigger value="trace" className="text-xs gap-1 relative">
+                        Trace
+                        {runTrace.length > 0 && (
+                          <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                            {runTrace.length}
+                          </Badge>
+                        )}
+                      </TabsTrigger>
+                      <TabsTrigger value="governance" className="text-xs gap-1">
+                        <Shield size={12} />
+                        Gov
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="inspector" className="mt-0 flex-1 min-h-0 overflow-hidden">
+                      <ScrollArea className="h-full">
+                        <div className="space-y-4 pr-2">
+                          <ContextInspector context={executionContext} />
+                          <ParameterPanel
+                            parameters={Array.isArray(safeStrategy.parameters) ? safeStrategy.parameters : []}
+                            onParametersChange={handleParametersChange}
+                          />
+                        </div>
+                      </ScrollArea>
                     </TabsContent>
 
-                  <TabsContent value="flow" className="mt-0 flex-1 min-h-0 overflow-hidden">
-                    <div className="h-full">
-                      <FlowDiagram
-                        cells={safeStrategy.cells}
-                        onCellClick={(index) => {
-                          setHighlightedCell(index)
-                          setActiveTab('cells')
-                          setTimeout(() => {
-                            const element = document.getElementById(`cell-${index}`)
-                            element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                          }, 100)
-                        }}
-                        highlightedCell={highlightedCell}
-                      />
-                    </div>
-                  </TabsContent>
+                    <TabsContent value="trace" className="mt-0 flex-1 min-h-0 overflow-hidden">
+                      <ScrollArea className="h-full">
+                        <div className="pr-2 space-y-3">
+                          {runTrace.length === 0 ? (
+                            <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                              No trace yet — run the strategy to see execution steps here.
+                            </div>
+                          ) : (
+                            <RunTraceViewer
+                              trace={{
+                                strategyId: safeStrategy.id,
+                                strategyName: safeStrategy.name,
+                                timestamp: Date.now(),
+                                steps: runTrace.map((t, i) => ({
+                                  cellIndex: t.cellIndex,
+                                  cellLabel: t.cellLabel,
+                                  code: '',
+                                  result: t.result,
+                                  executionTime: 0,
+                                  timestamp: t.timestamp,
+                                  reason: t.reasonCode,
+                                })),
+                                totalExecutionTime: runTrace.length > 1
+                                  ? runTrace[runTrace.length - 1].timestamp - runTrace[0].timestamp
+                                  : 0,
+                                success: true,
+                                finalVariables: executionContext.variables,
+                                branchPath: runTrace.map(t => t.cellIndex),
+                                loopIterations: {},
+                              }}
+                              onStepClick={(stepIndex) => {
+                                const step = runTrace[stepIndex]
+                                if (step) {
+                                  setHighlightedCell(step.cellIndex)
+                                  setActiveTab('cells')
+                                  setViewMode('notebook')
+                                  setTimeout(() => {
+                                    const element = document.getElementById(`cell-${step.cellIndex}`)
+                                    element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                  }, 100)
+                                }
+                              }}
+                            />
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </TabsContent>
 
-                  <TabsContent value="backtest" className="mt-0 flex-1 min-h-0 overflow-hidden">
-                    <ScrollArea className="h-full">
-                      <BacktestBuilder onRun={handleBacktestRun} />
-                    </ScrollArea>
-                  </TabsContent>
-                </Tabs>
-              </div>
-
-              <div className="lg:col-span-1 flex flex-col gap-4 min-h-0">
-                <ScrollArea className="flex-1">
-                  <div className="space-y-4 pr-2">
-                    <ContextInspector context={executionContext} />
-                    <ParameterPanel
-                      parameters={Array.isArray(safeStrategy.parameters) ? safeStrategy.parameters : []}
-                      onParametersChange={handleParametersChange}
-                    />
-                  </div>
-                </ScrollArea>
+                    <TabsContent value="governance" className="mt-0 flex-1 min-h-0 overflow-hidden">
+                      <ScrollArea className="h-full">
+                        <div className="pr-2">
+                          <GovernancePanel
+                            governance={safeStrategy.governance ?? createDefaultGovernance()}
+                            onGovernanceChange={handleGovernanceChange}
+                            currentUser={currentUser?.login}
+                          />
+                        </div>
+                      </ScrollArea>
+                    </TabsContent>
+                  </Tabs>
+                </div>
               </div>
             </div>
           </div>
@@ -934,7 +1106,6 @@ function App() {
             </div>
           </div>
         </div>
-      </div>
       </div>
     </div>
   )

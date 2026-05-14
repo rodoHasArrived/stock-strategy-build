@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MagnifyingGlass, CurrencyDollar, ChartLine, CreditCard, TrendUp, DotsSixVertical } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
+import { MagnifyingGlass, CurrencyDollar, ChartLine, CreditCard, TrendUp, DotsSixVertical, CaretDown, CaretRight, Code } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 export interface AMXDataField {
@@ -18,6 +19,7 @@ export interface AMXDataField {
   frequency: 'real-time' | 'daily' | 'static'
   fallback?: string
   lineage?: string
+  samplePayload?: Record<string, unknown>
 }
 
 const AMX_FIELDS: AMXDataField[] = [
@@ -71,7 +73,15 @@ const AMX_FIELDS: AMXDataField[] = [
     example: '175.43',
     frequency: 'real-time',
     fallback: 'CLEAN_PRICE if unavailable',
-    lineage: 'AMX Market Feed → Pricing Engine → PRICE'
+    lineage: 'AMX Market Feed → Pricing Engine → PRICE',
+    samplePayload: {
+      cusip: '912828YK0',
+      timestamp: '2025-05-14T15:45:00Z',
+      value: 175.43,
+      source: 'AMX_REALTIME',
+      currency: 'USD',
+      staleness_seconds: 1
+    }
   },
   {
     id: 'clean_price',
@@ -83,7 +93,15 @@ const AMX_FIELDS: AMXDataField[] = [
     example: '98.75',
     frequency: 'real-time',
     fallback: 'Last known clean price (T-1)',
-    lineage: 'AMX Bond Pricing → CLEAN_PRICE'
+    lineage: 'AMX Bond Pricing → CLEAN_PRICE',
+    samplePayload: {
+      cusip: '912828YK0',
+      timestamp: '2025-05-14T15:45:00Z',
+      clean_price: 98.75,
+      accrued_interest: 0.57,
+      dirty_price: 99.32,
+      settlement_date: '2025-05-16'
+    }
   },
   {
     id: 'dirty_price',
@@ -205,7 +223,19 @@ const AMX_FIELDS: AMXDataField[] = [
     example: '5.61%',
     frequency: 'real-time',
     fallback: 'Approximation via coupon + spread',
-    lineage: 'AMX Analytics → Newton-Raphson solver → YTM'
+    lineage: 'AMX Analytics → Newton-Raphson solver → YTM',
+    samplePayload: {
+      cusip: '912828YK0',
+      ytm: 0.0561,
+      calculation_date: '2025-05-14',
+      settlement_date: '2025-05-16',
+      price_used: 98.75,
+      face_value: 1000,
+      coupon_rate: 0.0525,
+      maturity: '2030-05-15',
+      day_count: 'ACT/ACT',
+      compounding: 'semiannual'
+    }
   },
   {
     id: 'ytc',
@@ -283,7 +313,17 @@ const AMX_FIELDS: AMXDataField[] = [
     example: 'AA-',
     frequency: 'daily',
     fallback: 'NR (not rated) if unavailable',
-    lineage: 'Moody\'s / S&P / Fitch → AMX Rating Service → RATING'
+    lineage: 'Moody\'s / S&P / Fitch → AMX Rating Service → RATING',
+    samplePayload: {
+      cusip: '912828YK0',
+      moodys: 'Aaa',
+      sp: 'AA+',
+      fitch: 'AA',
+      composite: 'AA+',
+      outlook: 'stable',
+      last_action: 'affirmed',
+      action_date: '2025-01-15'
+    }
   },
   {
     id: 'spread_to_treasury',
@@ -295,7 +335,16 @@ const AMX_FIELDS: AMXDataField[] = [
     example: '125',
     frequency: 'real-time',
     fallback: 'OAS spread if TSY spread unavailable',
-    lineage: 'AMX Market Feed → Treasury Curve → SPREAD_TSY'
+    lineage: 'AMX Market Feed → Treasury Curve → SPREAD_TSY',
+    samplePayload: {
+      cusip: '912828YK0',
+      spread_bps: 125,
+      benchmark_cusip: '91282CGT0',
+      benchmark_tenor: '5Y',
+      benchmark_yield: 0.0436,
+      bond_yield: 0.0561,
+      timestamp: '2025-05-14T15:45:00Z'
+    }
   },
   {
     id: 'eps',
@@ -356,6 +405,17 @@ interface AMXDataCatalogProps {
 export function AMXDataCatalog({ onFieldSelect, selectedFields = [] }: AMXDataCatalogProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState<string>('all')
+  const [expandedPayloads, setExpandedPayloads] = useState<Set<string>>(new Set())
+
+  const togglePayload = (id: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation()
+    setExpandedPayloads(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const filteredFields = AMX_FIELDS.filter(field => {
     const matchesSearch = searchQuery === '' || 
@@ -481,6 +541,26 @@ export function AMXDataCatalog({ onFieldSelect, selectedFields = [] }: AMXDataCa
                           <div className="flex items-start gap-2 text-xs">
                             <span className="text-muted-foreground shrink-0">Lineage:</span>
                             <code className="font-mono text-foreground/70 text-[10px] leading-4">{field.lineage}</code>
+                          </div>
+                        )}
+
+                        {field.samplePayload && (
+                          <div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground gap-1"
+                              onClick={(e) => togglePayload(field.id, e)}
+                            >
+                              {expandedPayloads.has(field.id) ? <CaretDown size={10} /> : <CaretRight size={10} />}
+                              <Code size={10} />
+                              Sample payload
+                            </Button>
+                            {expandedPayloads.has(field.id) && (
+                              <pre className="mt-1.5 text-[10px] font-mono bg-muted/50 rounded p-2 overflow-x-auto text-foreground/80 leading-relaxed border border-border/50">
+                                {JSON.stringify(field.samplePayload, null, 2)}
+                              </pre>
+                            )}
                           </div>
                         )}
 
