@@ -595,15 +595,15 @@ function App() {
     <div className="min-h-screen bg-background flex">
       <Toaster />
       
-      <div className="hidden lg:block w-80 border-r border-border bg-card/30 flex-shrink-0">
-        <div className="h-16 border-b border-border flex items-center px-4">
+      <div className="hidden lg:flex lg:flex-col w-80 border-r border-border bg-card/30 flex-shrink-0">
+        <div className="h-16 border-b border-border flex items-center px-4 flex-shrink-0">
           <h2 className="font-semibold flex items-center gap-2">
             <Database size={20} className="text-accent" />
             Data & Tools
           </h2>
         </div>
-        <Tabs value={leftPanelTab} onValueChange={(v) => setLeftPanelTab(v as 'data' | 'tools')} className="flex-1">
-          <TabsList className="w-[calc(100%-2rem)] mx-4 grid grid-cols-2">
+        <Tabs value={leftPanelTab} onValueChange={(v) => setLeftPanelTab(v as 'data' | 'tools')} className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="w-[calc(100%-2rem)] mx-4 mt-4 grid grid-cols-2 flex-shrink-0">
             <TabsTrigger value="data">
               <Database size={14} className="mr-2" />
               AMX Data
@@ -614,7 +614,7 @@ function App() {
             </TabsTrigger>
           </TabsList>
           
-          <ScrollArea className="h-[calc(100vh-120px)]">
+          <ScrollArea className="flex-1 mt-2">
             <TabsContent value="data" className="px-4 pb-4 mt-0">
               <div className="space-y-4">
                 {renderInsertionTargetHint()}
@@ -771,128 +771,139 @@ function App() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
-          <div className="container mx-auto p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              <div className="lg:col-span-3">
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <div className="flex items-center justify-between mb-4">
-                    <TabsList>
-                      <TabsTrigger value="cells" className="gap-2">
-                        <Code size={16} />
-                        Code Cells
-                      </TabsTrigger>
-                      <TabsTrigger value="flow" className="gap-2">
-                        <FlowArrow size={16} />
-                        Execution Flow
-                      </TabsTrigger>
-                      <TabsTrigger value="backtest" className="gap-2">
-                        <ChartLine size={16} />
-                        Backtest
-                      </TabsTrigger>
-                    </TabsList>
-                    <Button onClick={handleAddCell} size="sm" variant="outline">
-                      <Plus size={16} className="mr-2" />
-                      Add Cell
-                    </Button>
-                  </div>
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-auto">
+            <div className="container mx-auto p-6 h-full">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
+                <div className="lg:col-span-3 flex flex-col min-h-0">
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
+                    <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                      <TabsList>
+                        <TabsTrigger value="cells" className="gap-2">
+                          <Code size={16} />
+                          Code Cells
+                        </TabsTrigger>
+                        <TabsTrigger value="flow" className="gap-2">
+                          <FlowArrow size={16} />
+                          Execution Flow
+                        </TabsTrigger>
+                        <TabsTrigger value="backtest" className="gap-2">
+                          <ChartLine size={16} />
+                          Backtest
+                        </TabsTrigger>
+                      </TabsList>
+                      <Button onClick={handleAddCell} size="sm" variant="outline">
+                        <Plus size={16} className="mr-2" />
+                        Add Cell
+                      </Button>
+                    </div>
 
-                  <TabsContent value="cells" className="mt-0">
-                    <DragDropContext onDragEnd={handleDragEnd}>
-                      <div className="h-[calc(100vh-240px)] overflow-y-auto pr-4">
-                        <Droppable droppableId="cells-list">
-                          {(provided) => (
-                            <div
-                              {...provided.droppableProps}
-                              ref={provided.innerRef}
-                              className="space-y-4"
-                            >
-                              {safeStrategy.cells.map((cell, index) => (
-                                <Draggable key={cell.id} draggableId={cell.id} index={index}>
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      className="space-y-2"
-                                    >
+                    <TabsContent value="cells" className="mt-0 flex-1 min-h-0 overflow-hidden">
+                      <DragDropContext onDragEnd={handleDragEnd}>
+                        <ScrollArea className="h-full pr-2">
+                          <Droppable droppableId="cells-list">
+                            {(provided) => (
+                              <div
+                                {...provided.droppableProps}
+                                ref={provided.innerRef}
+                                className="space-y-4"
+                              >
+                                {safeStrategy.cells.map((cell, index) => (
+                                  <Draggable key={cell.id} draggableId={cell.id} index={index}>
+                                    {(provided, snapshot) => (
                                       <div
-                                        className={cn(
-                                          "transition-shadow",
-                                          snapshot.isDragging && "shadow-lg"
-                                        )}
+                                        ref={provided.innerRef}
+                                        {...provided.draggableProps}
+                                        className="space-y-2"
                                       >
-                                        <CodeCellComponent
-                                          cell={cell}
-                                          onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
-                                          onCellChange={(updates) => handleCellChange(cell.index, updates)}
-                                          onRun={() => handleRunCell(cell.index)}
-                                          onDelete={() => handleDeleteCell(cell.index)}
-                                          onDuplicate={() => handleDuplicateCell(cell.index)}
-                                          comments={cellComments}
-                                          onAddComment={handleAddComment}
-                                          onDeleteComment={handleDeleteComment}
-                                          onResolveComment={handleResolveComment}
-                                          currentUser={currentUser}
-                                          dragHandleProps={provided.dragHandleProps}
-                                          onActivate={(mode) => handleActivateCell(cell.index, mode)}
-                                          isActive={activeInsertionTarget.cellIndex === cell.index}
-                                        />
+                                        <div
+                                          className={cn(
+                                            "transition-shadow",
+                                            snapshot.isDragging && "shadow-lg"
+                                          )}
+                                        >
+                                          <CodeCellComponent
+                                            cell={cell}
+                                            onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
+                                            onCellChange={(updates) => handleCellChange(cell.index, updates)}
+                                            onRun={() => handleRunCell(cell.index)}
+                                            onDelete={() => handleDeleteCell(cell.index)}
+                                            onDuplicate={() => handleDuplicateCell(cell.index)}
+                                            comments={cellComments}
+                                            onAddComment={handleAddComment}
+                                            onDeleteComment={handleDeleteComment}
+                                            onResolveComment={handleResolveComment}
+                                            currentUser={currentUser}
+                                            dragHandleProps={provided.dragHandleProps}
+                                            onActivate={(mode) => handleActivateCell(cell.index, mode)}
+                                            isActive={activeInsertionTarget.cellIndex === cell.index}
+                                          />
+                                        </div>
+                                        
+                                        {index < safeStrategy.cells.length - 1 && (
+                                          <TransitionEditor
+                                            fromCell={cell.index}
+                                            toCell={cell.index + 1}
+                                            rules={[]}
+                                            onRulesChange={(rules) => {
+                                              console.log('Transition rules updated:', rules)
+                                            }}
+                                            cellCount={safeStrategy.cells.length}
+                                          />
+                                        )}
                                       </div>
-                                      
-                                      {index < safeStrategy.cells.length - 1 && (
-                                        <TransitionEditor
-                                          fromCell={cell.index}
-                                          toCell={cell.index + 1}
-                                          rules={[]}
-                                          onRulesChange={(rules) => {
-                                            console.log('Transition rules updated:', rules)
-                                          }}
-                                          cellCount={safeStrategy.cells.length}
-                                        />
-                                      )}
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                            </div>
-                          )}
-                        </Droppable>
-                      </div>
-                    </DragDropContext>
+                                    )}
+                                  </Draggable>
+                                ))}
+                                {provided.placeholder}
+                              </div>
+                            )}
+                          </Droppable>
+                        </ScrollArea>
+                      </DragDropContext>
+                    </TabsContent>
+
+                  <TabsContent value="flow" className="mt-0 flex-1 min-h-0 overflow-hidden">
+                    <div className="h-full">
+                      <FlowDiagram
+                        cells={safeStrategy.cells}
+                        onCellClick={(index) => {
+                          setHighlightedCell(index)
+                          setActiveTab('cells')
+                          setTimeout(() => {
+                            const element = document.getElementById(`cell-${index}`)
+                            element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                          }, 100)
+                        }}
+                        highlightedCell={highlightedCell}
+                      />
+                    </div>
                   </TabsContent>
 
-                  <TabsContent value="flow" className="mt-0">
-                    <FlowDiagram
-                      cells={safeStrategy.cells}
-                      onCellClick={(index) => {
-                        setHighlightedCell(index)
-                        setActiveTab('cells')
-                        setTimeout(() => {
-                          const element = document.getElementById(`cell-${index}`)
-                          element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                        }, 100)
-                      }}
-                      highlightedCell={highlightedCell}
-                    />
-                  </TabsContent>
-
-                  <TabsContent value="backtest" className="mt-0">
-                    <BacktestBuilder onRun={handleBacktestRun} />
+                  <TabsContent value="backtest" className="mt-0 flex-1 min-h-0 overflow-hidden">
+                    <ScrollArea className="h-full">
+                      <BacktestBuilder onRun={handleBacktestRun} />
+                    </ScrollArea>
                   </TabsContent>
                 </Tabs>
               </div>
 
-              <div className="lg:col-span-1 space-y-4">
-                <ContextInspector context={executionContext} />
-                <ParameterPanel
-                  parameters={Array.isArray(safeStrategy.parameters) ? safeStrategy.parameters : []}
-                  onParametersChange={handleParametersChange}
-                />
+              <div className="lg:col-span-1 flex flex-col gap-4 min-h-0">
+                <ScrollArea className="flex-1">
+                  <div className="space-y-4 pr-2">
+                    <ContextInspector context={executionContext} />
+                    <ParameterPanel
+                      parameters={Array.isArray(safeStrategy.parameters) ? safeStrategy.parameters : []}
+                      onParametersChange={handleParametersChange}
+                    />
+                  </div>
+                </ScrollArea>
               </div>
             </div>
+          </div>
 
-            <div className="mt-8 p-4 bg-muted/50 rounded-lg border border-border">
+          <div className="container mx-auto px-6 pb-6">
+            <div className="p-4 bg-muted/50 rounded-lg border border-border">
               <h3 className="text-sm font-medium mb-3">Control Flow & Syntax</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
                 <div className="font-mono">
@@ -923,6 +934,7 @@ function App() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )
