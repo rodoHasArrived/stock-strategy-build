@@ -62,7 +62,7 @@ function App() {
   })
 
   const [highlightedCell, setHighlightedCell] = useState<number | undefined>(undefined)
-  const [activeTab, setActiveTab] = useState<string>('cells')
+  const [activeTab, setActiveTab] = useState<string>('backtest')
   const [leftPanelTab, setLeftPanelTab] = useState<'data' | 'tools'>('data')
   const [selectedCellForTransition, setSelectedCellForTransition] = useState<number | undefined>(undefined)
   

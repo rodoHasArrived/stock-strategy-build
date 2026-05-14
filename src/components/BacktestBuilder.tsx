@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,27 +28,37 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
     slippageModel: 'adaptive'
   })
 
-  const [strategyCode, setStrategyCode] = useState(`// Define your strategy logic
-// Available: DataFrame, readJSON, toDatetime, toNumeric
-// Return { action: 'buy' | 'sell' | 'hold', symbol: string, shares?: number, reason?: string }
+  const [strategyCode, setStrategyCode] = useState(`// Z-score Mean Reversion Strategy
+// Switches between PA and PB based on yield spread Z-score
 
 const LOOKBACK = 60
 const MIN_LB = 20
+const Z_ENTER_PB = 0.25
+const Z_RETURN_PA = 0.75
 
+// Calculate rolling mean and std dev of yield spread
 const spreadMA = df.rolling(LOOKBACK, MIN_LB).mean('YieldSpread')
 const spreadSD = df.rolling(LOOKBACK, MIN_LB).std('YieldSpread')
 const Z = (row.YieldSpread - spreadMA[index]) / spreadSD[index]
 
-if (Z < -0.25) {
-  return { action: 'buy', symbol: 'PB', reason: 'Z-score below threshold' }
-} else if (Z > 0.75) {
-  return { action: 'sell', symbol: 'PB', reason: 'Z-score above threshold' }
+// Determine target holding based on Z-score
+if (state.holding === null || state.holding === 'PA') {
+  if (Z < -Z_ENTER_PB) {
+    return { action: 'buy', symbol: 'PB', reason: \`Z-score (\${Z.toFixed(2)}) < -\${Z_ENTER_PB}, switch to PB\` }
+  }
+} else if (state.holding === 'PB') {
+  if (Z > Z_RETURN_PA) {
+    return { action: 'buy', symbol: 'PA', reason: \`Z-score (\${Z.toFixed(2)}) > \${Z_RETURN_PA}, switch to PA\` }
+  }
 }
 
-return { action: 'hold' }
+return { action: 'hold', reason: \`Z-score (\${Z.toFixed(2)}) within range\` }
 `)
 
-  const [dataFiles, setDataFiles] = useState<Record<string, any>>({})
+  const [dataFiles, setDataFiles] = useState<Record<string, any>>({
+    PA: paData,
+    PB: pbData
+  })
   const [result, setResult] = useState<BacktestResult | null>(null)
   const [isRunning, setIsRunning] = useState(false)
   const [activeTab, setActiveTab] = useState('config')
@@ -85,6 +95,14 @@ return { action: 'hold' }
       setIsRunning(false)
     }
   }
+
+  useEffect(() => {
+    const autoRun = async () => {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      await handleRun()
+    }
+    autoRun()
+  }, [])
 
   return (
     <div className="space-y-4">
