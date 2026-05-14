@@ -387,7 +387,7 @@ export function CodeCellComponent({
               <TabsContent value="code" className="mt-3">
                 <div className="space-y-2">
                   <div className="overflow-hidden rounded-md border border-border bg-[#111827]">
-                    <Suspense fallback={<div className="flex h-[320px] items-center justify-center text-sm text-muted-foreground">Loading code editor…</div>}>
+                    <Suspense fallback={<div role="status" aria-live="polite" className="flex h-[320px] items-center justify-center text-sm text-muted-foreground">Loading code editor…</div>}>
                       <MonacoEditor
                         height="320px"
                         defaultLanguage="python"
