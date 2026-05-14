@@ -2,7 +2,7 @@ export type CellValue = string | number | boolean | null | any
 
 export type ExecutionStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped'
 
-export type ControlFlowType = 'next' | 'goto' | 'if' | 'loop' | 'stop' | 'none'
+export type ControlFlowType = 'next' | 'goto' | 'if' | 'loop' | 'while' | 'stop' | 'none'
 
 export type CellMode = 'visual' | 'formula' | 'code'
 
@@ -109,4 +109,26 @@ export interface StrategyTemplate {
   description: string
   category: string
   strategy: Omit<Strategy, 'id' | 'createdAt' | 'updatedAt'>
+}
+
+export interface TransitionRule {
+  id: string
+  condition?: string
+  action: 'next' | 'goto' | 'stop' | 'loop' | 'while'
+  target?: number
+  label?: string
+  loopConfig?: {
+    startCell: number
+    endCell: number
+    maxIterations: number
+    exitCondition?: string
+  }
+}
+
+export interface ExecutionPath {
+  fromCell: number
+  toCell: number
+  condition?: string
+  type: 'default' | 'conditional' | 'loop' | 'branch'
+  probability?: number
 }
