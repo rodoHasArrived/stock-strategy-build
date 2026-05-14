@@ -13,14 +13,25 @@ import "./styles/theme.css"
 import "./index.css"
 
 const resizeObserverErrorHandler = (e: ErrorEvent) => {
-  if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
+  if (e.message === 'ResizeObserver loop completed with undelivered notifications.' ||
+      e.message.includes('ResizeObserver loop')) {
     e.stopImmediatePropagation()
+    e.preventDefault()
     return false
   }
   return true
 }
 
 window.addEventListener('error', resizeObserverErrorHandler)
+
+const originalConsoleError = console.error
+console.error = (...args: any[]) => {
+  const errorMessage = args[0]?.toString() || ''
+  if (errorMessage.includes('ResizeObserver loop')) {
+    return
+  }
+  originalConsoleError.apply(console, args)
+}
 
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary FallbackComponent={ErrorFallback}>
