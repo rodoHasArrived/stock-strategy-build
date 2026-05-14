@@ -19,6 +19,8 @@ type TelemetrySnapshot = {
 }
 
 const TELEMETRY_KEY = 'strategy-ui-telemetry-v1'
+const RETENTION_VISIT_THRESHOLD_MS = 12 * 60 * 60 * 1000
+const MAX_EVENTS = 100
 
 const createDefaultSnapshot = (): TelemetrySnapshot => {
   const now = Date.now()
@@ -68,8 +70,7 @@ const mutateSnapshot = (mutator: (snapshot: TelemetrySnapshot) => TelemetrySnaps
 export const trackRetentionVisit = () => {
   mutateSnapshot((snapshot) => {
     const now = Date.now()
-    const dayMs = 24 * 60 * 60 * 1000
-    const isNewVisit = now - snapshot.lastVisitAt > dayMs * 0.5
+    const isNewVisit = now - snapshot.lastVisitAt > RETENTION_VISIT_THRESHOLD_MS
     return {
       ...snapshot,
       lastVisitAt: now,
@@ -81,7 +82,7 @@ export const trackRetentionVisit = () => {
 export const trackEvent = (name: string, data?: Record<string, unknown>) => {
   mutateSnapshot((snapshot) => ({
     ...snapshot,
-    events: [...snapshot.events.slice(-99), { name, timestamp: Date.now(), data }],
+    events: [...snapshot.events.slice(-(MAX_EVENTS - 1)), { name, timestamp: Date.now(), data }],
   }))
 }
 

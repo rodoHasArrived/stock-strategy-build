@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -233,7 +233,7 @@ export function BacktestBuilder({ onRun, quickStartRequest = 0, compactDefault =
     }
   }
 
-  const handleRun = async () => {
+  const handleRun = useCallback(async () => {
     setIsRunning(true)
     setRunError(null)
     try {
@@ -259,16 +259,17 @@ export function BacktestBuilder({ onRun, quickStartRequest = 0, compactDefault =
     } finally {
       setIsRunning(false)
     }
-  }
+  }, [onRun, config, strategyCode, dataFiles, onSummary])
 
   useEffect(() => {
     if (!compactDefault) return
+    // Quick mode prioritizes first-value realization by auto-running once on mount.
     const autoRun = async () => {
       await new Promise(resolve => setTimeout(resolve, 500))
       await handleRun()
     }
     void autoRun()
-  }, [])
+  }, [compactDefault, handleRun])
 
   useEffect(() => {
     if (quickStartRequest <= 0) return
@@ -279,7 +280,7 @@ export function BacktestBuilder({ onRun, quickStartRequest = 0, compactDefault =
     setShowAdvanced(false)
     setActiveTab('results')
     void handleRun()
-  }, [quickStartRequest])
+  }, [quickStartRequest, handleRun])
 
   const errorRecovery = (() => {
     if (!runError) return null

@@ -189,7 +189,11 @@ function App() {
   })
   const [showAdvanced, setShowAdvanced] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false
-    return window.localStorage.getItem(UI_STORAGE_KEYS.showAdvanced) === 'true'
+    try {
+      return JSON.parse(window.localStorage.getItem(UI_STORAGE_KEYS.showAdvanced) ?? 'false') === true
+    } catch {
+      return false
+    }
   })
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false
@@ -345,12 +349,13 @@ function App() {
     }
   }
 
-  const handleRunAll = async () => {
-    if (!strategy || !Array.isArray(strategy.cells)) return
+  const handleRunAll = async (strategyOverride?: Strategy) => {
+    const strategyToRun = strategyOverride ?? strategy
+    if (!strategyToRun || !Array.isArray(strategyToRun.cells)) return
 
     toast.info('Running all cells...')
     
-    const executor = new StrategyExecutor(strategy.cells, strategy.parameters)
+    const executor = new StrategyExecutor(strategyToRun.cells, strategyToRun.parameters)
     
     setStrategy((current) => {
       const defaultStrategy = createDefaultStrategy()
@@ -368,8 +373,8 @@ function App() {
 
     const runId = `run-${Date.now()}`
     saveRunLog(runId, {
-      strategyId: strategy.id,
-      strategyName: strategy.name,
+      strategyId: strategyToRun.id,
+      strategyName: strategyToRun.name,
       runId,
       timestamp: Date.now(),
       trace
@@ -530,7 +535,13 @@ function App() {
       }
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem('telemetry-retention-tracked') === 'true') {
+      return
+    }
     trackRetentionVisit()
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('telemetry-retention-tracked', 'true')
+    }
   }, [])
 
   useEffect(() => {
@@ -540,9 +551,9 @@ function App() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    window.localStorage.setItem(UI_STORAGE_KEYS.showAdvanced, String(showAdvanced))
+    window.localStorage.setItem(UI_STORAGE_KEYS.showAdvanced, JSON.stringify(showAdvanced))
     trackEvent('advanced_visibility_changed', { showAdvanced })
-  }, [showAdvanced])
+  }, [showAdvanced, handleLoadTemplate, handleRunAll])
 
   useEffect(() => {
     if (showAdvanced) return
@@ -697,16 +708,20 @@ function App() {
     )
   }
 
+  const buildStrategyFromTemplate = (template: StrategyTemplate): Strategy => ({
+    id: `strategy-${Date.now()}`,
+    name: template.name,
+    description: template.description,
+    cells: template.strategy.cells,
+    parameters: template.strategy.parameters,
+    transitions: template.strategy.transitions ?? {},
+    governance: template.strategy.governance ?? createDefaultGovernance(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  })
+
   const handleLoadTemplate = (template: StrategyTemplate) => {
-    const loadedStrategy: Strategy = {
-      id: `strategy-${Date.now()}`,
-      name: template.name,
-      description: template.description,
-      cells: template.strategy.cells,
-      parameters: template.strategy.parameters,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    }
+    const loadedStrategy = buildStrategyFromTemplate(template)
     setStrategy(loadedStrategy)
     setLastRunError(null)
     trackEvent('template_loaded', { templateId: template.id, templateName: template.name })
@@ -797,9 +812,12 @@ function App() {
   const handleQuickTemplateRun = async () => {
     const starter = strategyTemplates[0]
     if (!starter) return
-    handleLoadTemplate(starter)
+    const loaded = buildStrategyFromTemplate(starter)
+    setStrategy(loaded)
+    setLastRunError(null)
+    trackEvent('template_loaded', { templateId: starter.id, templateName: starter.name, source: 'quick_flow' })
     setActiveTab('cells')
-    await handleRunAll()
+    await handleRunAll(loaded)
   }
 
   const commandItems = useMemo(() => {
@@ -880,7 +898,7 @@ function App() {
         { label: showAdvanced ? 'Hide Advanced' : 'Show Advanced', onClick: () => setShowAdvanced((current) => !current) },
       ],
     }
-  }, [lastRunError, isDefaultStrategy, hasRunTrace, showAdvanced])
+  }, [lastRunError, isDefaultStrategy, hasRunTrace, showAdvanced, handleQuickTemplateRun, handleRunAll, handleApplyPreset])
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -1141,7 +1159,7 @@ function App() {
                         Choose your starting path
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Quick Start gets you first results fast; Advanced Workspace exposes full controls immediately.
+                        Quick Start gets you first results fast; Advanced workspace exposes full controls immediately.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1151,7 +1169,7 @@ function App() {
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => selectWorkspacePath('advanced')}>
                         <ArrowsOutSimple size={15} className="mr-1.5" />
-                        Advanced Workspace
+                        Advanced workspace
                       </Button>
                     </div>
                   </div>
