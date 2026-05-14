@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Calculator, Info, CheckCircle, XCircle, FlaskConical } from '@phosphor-icons/react'
+import { Calculator, Info, CheckCircle, XCircle, Flask } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 // ── Reference fixtures ────────────────────────────────────────────────────────
@@ -341,7 +341,7 @@ __result__ = custom_yield`
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm flex items-center gap-1">
-                  <FlaskConical size={14} />
+                  <Flask size={14} />
                   Fixture Validation
                 </Label>
                 <Button size="sm" variant="outline" onClick={runFixtures} className="h-7 text-xs">

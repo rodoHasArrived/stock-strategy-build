@@ -182,7 +182,6 @@ export interface TransitionRule {
     maxIterations: number
     exitCondition?: string
   }
-  backwardJumpJustification?: string
 }
 
 export interface RunTraceEntry {

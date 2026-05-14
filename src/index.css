@@ -90,11 +90,11 @@
   
   --shadow-offset-y: 6px;
   
-  --font-sans: "Oswald";
+  --font-sans: Oswald;
   
-  --font-serif: "Roboto Slab";
+  --font-serif: Roboto Slab;
   
-  --font-mono: "Space Mono";
+  --font-mono: Space Mono;
 }
 
 @theme {

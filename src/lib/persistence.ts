@@ -11,8 +11,6 @@ const KEY_STRATEGY = `${PREFIX}strategy`
 const KEY_RUN_LOG_INDEX = `${PREFIX}run-log-index`
 const KEY_ARTIFACT_INDEX = `${PREFIX}artifact-index`
 
-// ─── Strategy ────────────────────────────────────────────────────────────────
-
 export function saveStrategyExternal(strategy: unknown): void {
   try {
     localStorage.setItem(KEY_STRATEGY, JSON.stringify(strategy))
@@ -29,8 +27,6 @@ export function loadStrategyExternal(): unknown | null {
     return null
   }
 }
-
-// ─── Run logs ─────────────────────────────────────────────────────────────────
 
 function runLogKey(runId: string): string {
   return `${PREFIX}run-log:${runId}`
@@ -81,8 +77,6 @@ export function deleteRunLog(runId: string): void {
   }
 }
 
-// ─── Artifacts ────────────────────────────────────────────────────────────────
-
 function artifactKey(name: string): string {
   return `${PREFIX}artifact:${name}`
 }
@@ -120,8 +114,6 @@ export function loadArtifact(name: string): string | null {
 export function listArtifacts(): string[] {
   return artifactIndex()
 }
-
-// ─── File download helper ─────────────────────────────────────────────────────
 
 export function downloadJSON(data: unknown, filename: string): void {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
