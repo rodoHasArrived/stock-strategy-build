@@ -6,11 +6,15 @@ import { ParameterPanel } from '@/components/ParameterPanel'
 import { ContextInspector } from '@/components/ContextInspector'
 import { FlowDiagram } from '@/components/FlowDiagram'
 import { StrategyExecutor } from '@/lib/executor'
+import { AMXDataCatalog, AMXDataField } from '@/components/AMXDataCatalog'
+import { YieldCalculator } from '@/components/YieldCalculator'
+import { TransitionEditor } from '@/components/TransitionEditor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { FloppyDisk, Code, Plus, PlayCircle, FlowArrow } from '@phosphor-icons/react'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { FloppyDisk, Code, Plus, PlayCircle, FlowArrow, Database, Calculator, SidebarSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -46,6 +50,8 @@ function App() {
 
   const [highlightedCell, setHighlightedCell] = useState<number | undefined>(undefined)
   const [activeTab, setActiveTab] = useState<string>('cells')
+  const [leftPanelTab, setLeftPanelTab] = useState<'data' | 'tools'>('data')
+  const [selectedCellForTransition, setSelectedCellForTransition] = useState<number | undefined>(undefined)
 
   const handleCellCodeChange = (index: number, code: string) => {
     setStrategy((current) => {
@@ -214,133 +220,230 @@ function App() {
     return null
   }
 
+  const handleFieldSelect = (field: AMXDataField) => {
+    toast.info(`Field selected: ${field.function}(cusip)`)
+  }
+
+  const handleYieldFormulaGenerate = (formula: string) => {
+    const newIndex = strategy.cells.length
+    const newCell: CodeCell = createDefaultCell(newIndex, formula)
+    setStrategy((current) => {
+      if (!current || !Array.isArray(current.cells)) {
+        return createDefaultStrategy()
+      }
+      return {
+        ...current,
+        cells: [...current.cells, newCell],
+        updatedAt: Date.now()
+      }
+    })
+    toast.success('Yield formula cell added')
+  }
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex">
       <Toaster />
       
-      <div 
-        className="h-16 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-20"
-        style={{
-          background: 'repeating-linear-gradient(45deg, oklch(0.97 0.005 250), oklch(0.97 0.005 250) 10px, oklch(0.96 0.005 250) 10px, oklch(0.96 0.005 250) 20px)'
-        }}
-      >
-        <div className="container mx-auto h-full flex items-center justify-between px-6">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Code size={28} weight="duotone" className="text-accent" />
-              <h1 className="text-xl font-semibold tracking-tight">Strategy Executor</h1>
-            </div>
-            <Input
-              value={strategy.name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              className="w-64 h-9 bg-background"
-              placeholder="Strategy name"
-              id="strategy-name"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={handleRunAll} size="sm" variant="default">
-              <PlayCircle size={16} className="mr-2" weight="fill" />
-              Run All
-            </Button>
-            <Button onClick={handleSaveStrategy} size="sm" variant="secondary">
-              <FloppyDisk size={16} className="mr-2" />
-              Save
-            </Button>
-          </div>
+      <div className="hidden lg:block w-80 border-r border-border bg-card/30 flex-shrink-0">
+        <div className="h-16 border-b border-border flex items-center px-4">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Database size={20} className="text-accent" />
+            Data & Tools
+          </h2>
         </div>
+        <Tabs value={leftPanelTab} onValueChange={(v) => setLeftPanelTab(v as 'data' | 'tools')} className="flex-1">
+          <TabsList className="w-full grid grid-cols-2 m-4">
+            <TabsTrigger value="data">
+              <Database size={14} className="mr-2" />
+              AMX Data
+            </TabsTrigger>
+            <TabsTrigger value="tools">
+              <Calculator size={14} className="mr-2" />
+              Tools
+            </TabsTrigger>
+          </TabsList>
+          
+          <ScrollArea className="h-[calc(100vh-120px)]">
+            <TabsContent value="data" className="px-4 pb-4 mt-0">
+              <AMXDataCatalog onFieldSelect={handleFieldSelect} />
+            </TabsContent>
+            
+            <TabsContent value="tools" className="px-4 pb-4 mt-0 space-y-4">
+              <YieldCalculator onGenerateFormula={handleYieldFormulaGenerate} />
+            </TabsContent>
+          </ScrollArea>
+        </Tabs>
       </div>
 
-      <div className="container mx-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <div className="flex items-center justify-between mb-4">
-                <TabsList>
-                  <TabsTrigger value="cells" className="gap-2">
-                    <Code size={16} />
-                    Code Cells
-                  </TabsTrigger>
-                  <TabsTrigger value="flow" className="gap-2">
-                    <FlowArrow size={16} />
-                    Execution Flow
-                  </TabsTrigger>
-                </TabsList>
-                <Button onClick={handleAddCell} size="sm" variant="outline">
-                  <Plus size={16} className="mr-2" />
-                  Add Cell
-                </Button>
+      <div className="flex-1 flex flex-col">
+        <div 
+          className="h-16 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-20"
+          style={{
+            background: 'repeating-linear-gradient(45deg, oklch(0.97 0.005 250), oklch(0.97 0.005 250) 10px, oklch(0.96 0.005 250) 10px, oklch(0.96 0.005 250) 20px)'
+          }}
+        >
+          <div className="h-full flex items-center justify-between px-6">
+            <div className="flex items-center gap-4">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm" className="lg:hidden">
+                    <SidebarSimple size={20} />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-80 p-0">
+                  <SheetHeader className="h-16 border-b px-4 flex flex-row items-center">
+                    <SheetTitle>Data & Tools</SheetTitle>
+                  </SheetHeader>
+                  <Tabs value={leftPanelTab} onValueChange={(v) => setLeftPanelTab(v as 'data' | 'tools')} className="flex-1">
+                    <TabsList className="w-full grid grid-cols-2 m-4">
+                      <TabsTrigger value="data">AMX Data</TabsTrigger>
+                      <TabsTrigger value="tools">Tools</TabsTrigger>
+                    </TabsList>
+                    
+                    <ScrollArea className="h-[calc(100vh-160px)]">
+                      <TabsContent value="data" className="px-4 pb-4 mt-0">
+                        <AMXDataCatalog onFieldSelect={handleFieldSelect} />
+                      </TabsContent>
+                      
+                      <TabsContent value="tools" className="px-4 pb-4 mt-0 space-y-4">
+                        <YieldCalculator onGenerateFormula={handleYieldFormulaGenerate} />
+                      </TabsContent>
+                    </ScrollArea>
+                  </Tabs>
+                </SheetContent>
+              </Sheet>
+
+              <div className="flex items-center gap-2">
+                <Code size={28} weight="duotone" className="text-accent" />
+                <h1 className="text-xl font-semibold tracking-tight">Strategy Executor</h1>
               </div>
-
-              <TabsContent value="cells" className="mt-0">
-                <ScrollArea className="h-[calc(100vh-240px)]">
-                  <div className="space-y-4 pr-4">
-                    {strategy.cells.map((cell) => (
-                      <CodeCellComponent
-                        key={cell.id}
-                        cell={cell}
-                        onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
-                        onCellChange={(updates) => handleCellChange(cell.index, updates)}
-                        onRun={() => handleRunCell(cell.index)}
-                        onDelete={() => handleDeleteCell(cell.index)}
-                      />
-                    ))}
-                  </div>
-                </ScrollArea>
-              </TabsContent>
-
-              <TabsContent value="flow" className="mt-0">
-                <FlowDiagram
-                  cells={strategy.cells}
-                  onCellClick={(index) => {
-                    setHighlightedCell(index)
-                    setActiveTab('cells')
-                    setTimeout(() => {
-                      const element = document.getElementById(`cell-${index}`)
-                      element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                    }, 100)
-                  }}
-                  highlightedCell={highlightedCell}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          <div className="lg:col-span-1 space-y-4">
-            <ContextInspector context={executionContext} />
-            <ParameterPanel
-              parameters={Array.isArray(strategy.parameters) ? strategy.parameters : []}
-              onParametersChange={handleParametersChange}
-            />
+              <Input
+                value={strategy.name}
+                onChange={(e) => handleNameChange(e.target.value)}
+                className="w-64 h-9 bg-background hidden md:block"
+                placeholder="Strategy name"
+                id="strategy-name"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={handleRunAll} size="sm" variant="default">
+                <PlayCircle size={16} className="mr-2" weight="fill" />
+                <span className="hidden sm:inline">Run All</span>
+              </Button>
+              <Button onClick={handleSaveStrategy} size="sm" variant="secondary">
+                <FloppyDisk size={16} className="mr-2" />
+                <span className="hidden sm:inline">Save</span>
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div className="mt-8 p-4 bg-muted/50 rounded-lg border border-border">
-          <h3 className="text-sm font-medium mb-3">Control Flow & Syntax</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-            <div className="font-mono">
-              <span className="text-accent font-semibold">if cond: next</span>
-              <p className="text-muted-foreground mt-1">Skip to next cell if true</p>
+        <div className="flex-1 overflow-auto">
+          <div className="container mx-auto p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div className="lg:col-span-3">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <div className="flex items-center justify-between mb-4">
+                    <TabsList>
+                      <TabsTrigger value="cells" className="gap-2">
+                        <Code size={16} />
+                        Code Cells
+                      </TabsTrigger>
+                      <TabsTrigger value="flow" className="gap-2">
+                        <FlowArrow size={16} />
+                        Execution Flow
+                      </TabsTrigger>
+                    </TabsList>
+                    <Button onClick={handleAddCell} size="sm" variant="outline">
+                      <Plus size={16} className="mr-2" />
+                      Add Cell
+                    </Button>
+                  </div>
+
+                  <TabsContent value="cells" className="mt-0">
+                    <ScrollArea className="h-[calc(100vh-240px)]">
+                      <div className="space-y-4 pr-4">
+                        {strategy.cells.map((cell, index) => (
+                          <div key={cell.id} className="space-y-2">
+                            <CodeCellComponent
+                              cell={cell}
+                              onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
+                              onCellChange={(updates) => handleCellChange(cell.index, updates)}
+                              onRun={() => handleRunCell(cell.index)}
+                              onDelete={() => handleDeleteCell(cell.index)}
+                            />
+                            
+                            {index < strategy.cells.length - 1 && (
+                              <TransitionEditor
+                                fromCell={cell.index}
+                                toCell={cell.index + 1}
+                                rules={[]}
+                                onRulesChange={(rules) => {
+                                  console.log('Transition rules updated:', rules)
+                                }}
+                                cellCount={strategy.cells.length}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+
+                  <TabsContent value="flow" className="mt-0">
+                    <FlowDiagram
+                      cells={strategy.cells}
+                      onCellClick={(index) => {
+                        setHighlightedCell(index)
+                        setActiveTab('cells')
+                        setTimeout(() => {
+                          const element = document.getElementById(`cell-${index}`)
+                          element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        }, 100)
+                      }}
+                      highlightedCell={highlightedCell}
+                    />
+                  </TabsContent>
+                </Tabs>
+              </div>
+
+              <div className="lg:col-span-1 space-y-4">
+                <ContextInspector context={executionContext} />
+                <ParameterPanel
+                  parameters={Array.isArray(strategy.parameters) ? strategy.parameters : []}
+                  onParametersChange={handleParametersChange}
+                />
+              </div>
             </div>
-            <div className="font-mono">
-              <span className="text-accent font-semibold">if cond: goto 5</span>
-              <p className="text-muted-foreground mt-1">Jump to cell 5 if true</p>
-            </div>
-            <div className="font-mono">
-              <span className="text-accent font-semibold">goto 3</span>
-              <p className="text-muted-foreground mt-1">Jump to cell 3</p>
-            </div>
-            <div className="font-mono">
-              <span className="text-accent font-semibold">next</span>
-              <p className="text-muted-foreground mt-1">Skip to next cell</p>
-            </div>
-            <div className="font-mono">
-              <span className="text-accent font-semibold">__result__ = value</span>
-              <p className="text-muted-foreground mt-1">Set cell output</p>
-            </div>
-            <div className="font-mono">
-              <span className="text-accent font-semibold">PRICE(cusip)</span>
-              <p className="text-muted-foreground mt-1">Get security price</p>
+
+            <div className="mt-8 p-4 bg-muted/50 rounded-lg border border-border">
+              <h3 className="text-sm font-medium mb-3">Control Flow & Syntax</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                <div className="font-mono">
+                  <span className="text-accent font-semibold">if cond: next</span>
+                  <p className="text-muted-foreground mt-1">Skip to next cell if true</p>
+                </div>
+                <div className="font-mono">
+                  <span className="text-accent font-semibold">if cond: goto 5</span>
+                  <p className="text-muted-foreground mt-1">Jump to cell 5 if true</p>
+                </div>
+                <div className="font-mono">
+                  <span className="text-accent font-semibold">goto 3</span>
+                  <p className="text-muted-foreground mt-1">Jump to cell 3</p>
+                </div>
+                <div className="font-mono">
+                  <span className="text-accent font-semibold">next</span>
+                  <p className="text-muted-foreground mt-1">Skip to next cell</p>
+                </div>
+                <div className="font-mono">
+                  <span className="text-accent font-semibold">__result__ = value</span>
+                  <p className="text-muted-foreground mt-1">Set cell output</p>
+                </div>
+                <div className="font-mono">
+                  <span className="text-accent font-semibold">PRICE(cusip)</span>
+                  <p className="text-muted-foreground mt-1">Get security price</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
