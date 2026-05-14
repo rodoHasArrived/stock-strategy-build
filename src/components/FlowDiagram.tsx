@@ -297,9 +297,9 @@ export function FlowDiagram({ cells, onCellClick, highlightedCell }: FlowDiagram
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <ScrollArea className="h-[400px]">
-          <div className="p-6" style={{ minWidth: width, minHeight: height }}>
-            <svg width={width} height={height} className="absolute top-0 left-0 pointer-events-none">
+        <ScrollArea className="h-[calc(100vh-240px)]">
+          <div className="p-6 relative" style={{ minWidth: width, minHeight: height }}>
+            <svg width={width} height={height} className="absolute top-6 left-6 pointer-events-none">
               <defs>
                 <marker
                   id="arrowhead"
