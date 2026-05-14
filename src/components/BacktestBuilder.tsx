@@ -9,10 +9,12 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { PlayCircle, TrendUp, TrendDown, Equals, Upload, ChartLine, Table as TableIcon } from '@phosphor-icons/react'
+import { PlayCircle, TrendUp, TrendDown, Equals, Upload, ChartLine, Table as TableIcon, Download } from '@phosphor-icons/react'
 import { BacktestResult, BacktestConfig } from '@/lib/types'
 import { toast } from 'sonner'
 import { EquityCurveChart } from '@/components/EquityCurveChart'
+import paData from '@/assets/data/PCG-PA_daily_bars.json'
+import pbData from '@/assets/data/PCG-PB_daily_bars.json'
 
 interface BacktestBuilderProps {
   onRun: (config: BacktestConfig, strategyCode: string, dataFiles: Record<string, any>) => Promise<BacktestResult>
@@ -60,6 +62,14 @@ return { action: 'hold' }
     } catch (error) {
       toast.error(`Failed to load ${symbol} data`)
     }
+  }
+
+  const handleLoadSampleData = () => {
+    setDataFiles({
+      PA: paData,
+      PB: pbData
+    })
+    toast.success('Sample data loaded for PA and PB')
   }
 
   const handleRun = async () => {
@@ -162,6 +172,17 @@ return { action: 'hold' }
               <CardDescription>Upload JSON files with daily bars for your securities</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-accent/5">
+                <div>
+                  <p className="font-medium">PCG Preferred Stock Sample Data</p>
+                  <p className="text-sm text-muted-foreground">2023 daily bars for PCG-PA and PCG-PB</p>
+                </div>
+                <Button onClick={handleLoadSampleData} variant="default" size="sm">
+                  <Download size={16} className="mr-2" />
+                  Load Sample Data
+                </Button>
+              </div>
+
               <div className="grid grid-cols-1 gap-4">
                 {['PA', 'PB'].map(symbol => (
                   <div key={symbol} className="border rounded-lg p-4 space-y-2">
