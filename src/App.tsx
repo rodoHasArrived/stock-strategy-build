@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { CodeCell, Parameter, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment } from '@/lib/types'
 import { CodeCellComponent } from '@/components/CodeCellComponent'
@@ -46,6 +46,7 @@ const createDefaultStrategy = (): Strategy => ({
 
 function App() {
   const [strategy, setStrategy] = useKV<Strategy>('current-strategy', createDefaultStrategy())
+  const [currentUser, setCurrentUser] = useState<{ login: string; avatarUrl: string } | undefined>(undefined)
 
   const [executionContext, setExecutionContext] = useState<ExecutionContext>({
     variables: {},
@@ -98,6 +99,23 @@ function App() {
     }
   ])
   const [cellComments, setCellComments] = useKV<CellComment[]>('cell-comments', [])
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await window.spark.user()
+        if (user) {
+          setCurrentUser({
+            login: user.login,
+            avatarUrl: user.avatarUrl
+          })
+        }
+      } catch (error) {
+        console.error('Failed to fetch user:', error)
+      }
+    }
+    fetchUser()
+  }, [])
 
   const handleCellCodeChange = (index: number, code: string) => {
     setStrategy((current) => {
@@ -510,6 +528,11 @@ function App() {
                               onCellChange={(updates) => handleCellChange(cell.index, updates)}
                               onRun={() => handleRunCell(cell.index)}
                               onDelete={() => handleDeleteCell(cell.index)}
+                              comments={cellComments}
+                              onAddComment={handleAddComment}
+                              onDeleteComment={handleDeleteComment}
+                              onResolveComment={handleResolveComment}
+                              currentUser={currentUser}
                             />
                             
                             {index < strategy.cells.length - 1 && (

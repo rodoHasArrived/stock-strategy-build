@@ -1,15 +1,18 @@
 import { useState, useRef, useEffect } from 'react'
-import { CodeCell as CodeCellType, CellMode, Condition } from '@/lib/types'
+import { CodeCell as CodeCellType, CellMode, Condition, CellComment } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon } from '@phosphor-icons/react'
+import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon, ChatCircle, NoteBlank } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { VisualBuilder } from '@/components/VisualBuilder'
 import { DataFieldSelector } from '@/components/DataFieldSelector'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { CellComments } from '@/components/CellComments'
+import { Input } from '@/components/ui/input'
 
 interface CodeCellProps {
   cell: CodeCellType
@@ -17,11 +20,34 @@ interface CodeCellProps {
   onRun: () => void
   onDelete: () => void
   onCellChange: (updates: Partial<CodeCellType>) => void
+  comments?: CellComment[]
+  onAddComment?: (cellId: string, text: string, parentId?: string) => void
+  onDeleteComment?: (commentId: string) => void
+  onResolveComment?: (commentId: string) => void
+  currentUser?: {
+    login: string
+    avatarUrl: string
+  }
 }
 
-export function CodeCellComponent({ cell, onCodeChange, onRun, onDelete, onCellChange }: CodeCellProps) {
+export function CodeCellComponent({ 
+  cell, 
+  onCodeChange, 
+  onRun, 
+  onDelete, 
+  onCellChange, 
+  comments = [],
+  onAddComment,
+  onDeleteComment,
+  onResolveComment,
+  currentUser
+}: CodeCellProps) {
   const [isEditing, setIsEditing] = useState(false)
+  const [cellLabel, setCellLabel] = useState(cell.label || '')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  
+  const cellComments = comments.filter(c => c.cellId === cell.id)
+  const unresolvedComments = cellComments.filter(c => !c.parentId && !c.resolved).length
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -103,26 +129,98 @@ export function CodeCellComponent({ cell, onCodeChange, onRun, onDelete, onCellC
     >
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-mono font-medium text-muted-foreground">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <span className="text-sm font-mono font-medium text-muted-foreground flex-shrink-0">
               [{cell.index}]
             </span>
-            {getStatusBadge()}
-            {cell.executionTime != null && (
-              <span className="text-xs text-muted-foreground">
-                {cell.executionTime.toFixed(2)}ms
-              </span>
+            
+            {cellLabel ? (
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <NoteBlank size={14} className="text-accent flex-shrink-0" weight="fill" />
+                <Input
+                  value={cellLabel}
+                  onChange={(e) => setCellLabel(e.target.value)}
+                  onBlur={() => {
+                    onCellChange({ label: cellLabel })
+                  }}
+                  placeholder="Cell label..."
+                  className="h-7 text-sm font-medium max-w-xs"
+                />
+              </div>
+            ) : (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setCellLabel('Cell Label')}
+              >
+                <NoteBlank size={14} className="mr-1" />
+                Add Label
+              </Button>
             )}
-            {cell.controlFlow && (
-              <Badge variant="outline" className="text-xs">
-                {cell.controlFlow.type === 'goto' 
-                  ? `→ cell ${cell.controlFlow.target}`
-                  : cell.controlFlow.type
-                }
-              </Badge>
-            )}
+            
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {getStatusBadge()}
+              {cell.executionTime != null && (
+                <span className="text-xs text-muted-foreground">
+                  {cell.executionTime.toFixed(2)}ms
+                </span>
+              )}
+              {cell.controlFlow && (
+                <Badge variant="outline" className="text-xs">
+                  {cell.controlFlow.type === 'goto' 
+                    ? `→ cell ${cell.controlFlow.target}`
+                    : cell.controlFlow.type
+                  }
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {onAddComment && (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant={unresolvedComments > 0 ? "default" : "outline"}
+                    className={cn(
+                      "h-8 relative",
+                      unresolvedComments > 0 && "pr-7"
+                    )}
+                  >
+                    <ChatCircle size={16} className="mr-1" weight={unresolvedComments > 0 ? "fill" : "regular"} />
+                    {unresolvedComments > 0 ? (
+                      <>
+                        Notes
+                        <Badge 
+                          variant="secondary" 
+                          className="ml-1.5 h-5 px-1.5 min-w-5 bg-background/50 absolute right-1"
+                        >
+                          {unresolvedComments}
+                        </Badge>
+                      </>
+                    ) : (
+                      'Notes'
+                    )}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[500px] sm:w-[600px] p-0">
+                  <SheetHeader className="p-6 pb-4">
+                    <SheetTitle>Cell [{cell.index}] Notes & Comments</SheetTitle>
+                  </SheetHeader>
+                  <div className="px-6 pb-6">
+                    <CellComments
+                      cellId={cell.id}
+                      comments={comments}
+                      onAddComment={(text, parentId) => onAddComment(cell.id, text, parentId)}
+                      onDeleteComment={onDeleteComment || (() => {})}
+                      onResolveComment={onResolveComment || (() => {})}
+                      currentUser={currentUser}
+                    />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
             <Button
               size="sm"
               onClick={onRun}
