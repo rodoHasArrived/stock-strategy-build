@@ -1,20 +1,25 @@
 import { useState, useRef, useEffect } from 'react'
-import { CodeCell as CodeCellType } from '@/lib/types'
+import { CodeCell as CodeCellType, CellMode, Condition } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Play, CheckCircle, XCircle, Clock, ArrowRight } from '@phosphor-icons/react'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
+import { VisualBuilder } from '@/components/VisualBuilder'
+import { DataFieldSelector } from '@/components/DataFieldSelector'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface CodeCellProps {
   cell: CodeCellType
   onCodeChange: (code: string) => void
   onRun: () => void
   onDelete: () => void
+  onCellChange: (updates: Partial<CodeCellType>) => void
 }
 
-export function CodeCellComponent({ cell, onCodeChange, onRun, onDelete }: CodeCellProps) {
+export function CodeCellComponent({ cell, onCodeChange, onRun, onDelete, onCellChange }: CodeCellProps) {
   const [isEditing, setIsEditing] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -57,6 +62,33 @@ export function CodeCellComponent({ cell, onCodeChange, onRun, onDelete }: CodeC
       default:
         return <Badge variant="secondary">Idle</Badge>
     }
+  }
+
+  const handleConditionsChange = (conditions: Condition[]) => {
+    const visualConfig = { ...cell.visualConfig, conditions }
+    onCellChange({ visualConfig })
+    
+    const conditionCode = conditions.map((c, i) => {
+      const logic = i > 0 && c.logic ? ` ${c.logic.toLowerCase()} ` : ''
+      const condition = c.operator === 'between'
+        ? `${c.field}(cusip) >= ${c.value} and ${c.field}(cusip) <= ${c.value2}`
+        : `${c.field}(cusip) ${c.operator} ${typeof c.value === 'string' ? `"${c.value}"` : c.value}`
+      return `${i > 0 ? '\n' : ''}${logic}${condition}`
+    }).join('')
+    
+    onCodeChange(`if ${conditionCode}:\n  __result__ = "Match"`)
+  }
+
+  const handleDataFieldsChange = (dataFields: string[]) => {
+    const visualConfig = { ...cell.visualConfig, dataFields }
+    onCellChange({ visualConfig })
+    
+    const fieldsCode = dataFields.map(field => `${field.toLowerCase()} = ${field}(cusip)`).join('\n')
+    onCodeChange(fieldsCode)
+  }
+
+  const handleModeChange = (mode: CellMode) => {
+    onCellChange({ mode })
   }
 
   return (
@@ -106,18 +138,84 @@ export function CodeCellComponent({ cell, onCodeChange, onRun, onDelete }: CodeC
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Textarea
-            ref={textareaRef}
-            value={cell.code}
-            onChange={(e) => onCodeChange(e.target.value)}
-            onFocus={() => setIsEditing(true)}
-            onBlur={() => setIsEditing(false)}
-            placeholder="Enter code... (use 'if condition: next', 'goto n', etc.)"
-            className="font-mono text-sm min-h-[80px] resize-y bg-muted/30"
-            id={`cell-${cell.index}`}
-          />
-        </div>
+        <Tabs value={cell.mode} onValueChange={(value) => handleModeChange(value as CellMode)}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="visual" className="text-xs">
+              <Shapes size={14} className="mr-1" />
+              Visual
+            </TabsTrigger>
+            <TabsTrigger value="formula" className="text-xs">
+              <FunctionIcon size={14} className="mr-1" />
+              Formula
+            </TabsTrigger>
+            <TabsTrigger value="code" className="text-xs">
+              <CodeIcon size={14} className="mr-1" />
+              Code
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="visual" className="space-y-3 mt-3">
+            <ScrollArea className="max-h-[400px]">
+              <div className="space-y-4 pr-3">
+                <VisualBuilder
+                  conditions={cell.visualConfig?.conditions || []}
+                  onConditionsChange={handleConditionsChange}
+                />
+                
+                <div className="border-t pt-4">
+                  <DataFieldSelector
+                    selectedFields={cell.visualConfig?.dataFields || []}
+                    onFieldsChange={handleDataFieldsChange}
+                    aggregation={cell.visualConfig?.aggregation}
+                    onAggregationChange={(agg) => {
+                      const visualConfig = { ...cell.visualConfig, aggregation: agg }
+                      onCellChange({ visualConfig })
+                    }}
+                    sortBy={cell.visualConfig?.sortBy}
+                    sortOrder={cell.visualConfig?.sortOrder}
+                    onSortChange={(sortBy, sortOrder) => {
+                      const visualConfig = { ...cell.visualConfig, sortBy, sortOrder }
+                      onCellChange({ visualConfig })
+                    }}
+                  />
+                </div>
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="formula" className="mt-3">
+            <div className="space-y-2">
+              <Textarea
+                ref={textareaRef}
+                value={cell.code}
+                onChange={(e) => onCodeChange(e.target.value)}
+                onFocus={() => setIsEditing(true)}
+                onBlur={() => setIsEditing(false)}
+                placeholder="Enter formula... (e.g., PRICE(cusip) > 100)"
+                className="font-mono text-sm min-h-[80px] resize-y bg-muted/30"
+                id={`cell-formula-${cell.index}`}
+              />
+              <div className="text-xs text-muted-foreground">
+                Use functions: PRICE(), YIELD(), COUPON(), DURATION(), SPREAD(), RATING(), SECTOR()
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="code" className="mt-3">
+            <div className="space-y-2">
+              <Textarea
+                ref={textareaRef}
+                value={cell.code}
+                onChange={(e) => onCodeChange(e.target.value)}
+                onFocus={() => setIsEditing(true)}
+                onBlur={() => setIsEditing(false)}
+                placeholder="Enter code... (use 'if condition: next', 'goto n', etc.)"
+                className="font-mono text-sm min-h-[80px] resize-y bg-muted/30"
+                id={`cell-code-${cell.index}`}
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
 
         {cell.output && cell.status !== 'error' && (
           <div className="border-l-4 border-success pl-3 py-2">

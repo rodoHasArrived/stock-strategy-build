@@ -57,6 +57,21 @@ function App() {
     })
   }
 
+  const handleCellChange = (index: number, updates: Partial<CodeCell>) => {
+    setStrategy((current) => {
+      if (!current || !Array.isArray(current.cells)) {
+        return createDefaultStrategy()
+      }
+      const newCells = [...current.cells]
+      newCells[index] = { ...newCells[index], ...updates }
+      return {
+        ...current,
+        cells: newCells,
+        updatedAt: Date.now()
+      }
+    })
+  }
+
   const handleDeleteCell = (index: number) => {
     setStrategy((current) => {
       if (!current || !Array.isArray(current.cells)) {
@@ -250,6 +265,7 @@ function App() {
                       key={cell.id}
                       cell={cell}
                       onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
+                      onCellChange={(updates) => handleCellChange(cell.index, updates)}
                       onRun={() => handleRunCell(cell.index)}
                       onDelete={() => handleDeleteCell(cell.index)}
                     />

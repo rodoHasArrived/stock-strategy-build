@@ -13,11 +13,11 @@ A comprehensive cell-based investment strategy builder that enables users to cre
 ## Essential Features
 
 ### Multi-Mode Cell Interface
-- **Functionality**: Each cell supports three modes - Visual Builder (drag-and-drop conditions), Formula Mode (Excel-like), and Advanced Code Mode (Python-style)
+- **Functionality**: Each cell supports three modes - Visual Builder (drag-and-drop conditions and data field selectors), Formula Mode (Excel-like), and Advanced Code Mode (Python-style)
 - **Purpose**: Enable non-technical users to start with visual mode and progressively learn more advanced techniques as they grow
-- **Trigger**: User toggles mode selector in cell header (Visual/Formula/Code buttons)
-- **Progression**: Select Visual mode → Drag condition blocks → Configure thresholds → Preview results → Switch to Formula mode to see generated expression → Switch to Code for full control → Live preview updates in all modes
-- **Success criteria**: Mode switching preserves intent, visual builder generates valid code, formula syntax highlighting works, code autocomplete suggests functions and variables
+- **Trigger**: User toggles mode selector tabs in cell header (Visual/Formula/Code buttons)
+- **Progression**: Select Visual mode → Drag condition blocks → Configure thresholds → Add data field selectors → Preview results → Switch to Formula mode to see generated expression → Switch to Code for full control → Live preview updates in all modes → Generated code syncs across modes
+- **Success criteria**: Mode switching preserves intent, visual builder generates valid code, drag-and-drop reordering works smoothly, formula syntax highlighting works, code autocomplete suggests functions and variables, real-time code generation from visual blocks
 
 ### Cell Purpose Classification
 - **Functionality**: Cells can be tagged by purpose - Universe Definition, Data Retrieval, Calculation, Condition, Ranking, Portfolio Construction, Risk Check, Trade Generation
@@ -81,6 +81,20 @@ A comprehensive cell-based investment strategy builder that enables users to cre
 - **Trigger**: User clicks "Explain" on cell output or security in results
 - **Progression**: Click Explain → Decision tree shows → Trace back to source → View values → Export report
 - **Success criteria**: Complete lineage, clear visualization, PDF export, security-level explanations
+
+### Visual Condition Builder
+- **Functionality**: Drag-and-drop interface for building complex conditional logic without writing code
+- **Purpose**: Allow non-technical users to create sophisticated filters and decision rules visually
+- **Trigger**: User switches to Visual mode tab in any cell
+- **Progression**: Click Add Condition → Select data field (PRICE, YIELD, COUPON, etc.) → Choose operator (>, <, =, between) → Enter value(s) → Add AND/OR logic connectors → Drag to reorder → Real-time code generation displays below → Switch to Code mode to see result
+- **Success criteria**: Smooth drag-and-drop, instant code generation, supports nested conditions, clear visual hierarchy, condition blocks show field type badges, between operator supports min/max values
+
+### Data Field Selector
+- **Functionality**: Visual interface for selecting which AMX data fields to retrieve and display, organized by category (Market, Fundamental, Identity)
+- **Purpose**: Simplify data retrieval by providing a categorized checklist of available fields instead of requiring users to remember function names
+- **Trigger**: User scrolls down in Visual mode to Data Fields section
+- **Progression**: Browse categories (Market/Fundamental/Identity) → Click field cards to toggle selection → Selected fields highlight with accent ring → Choose aggregation method (sum/avg/max/min/count) → Set sort field and order → Generated code shows field assignments → Execute to retrieve data
+- **Success criteria**: Clear category organization, visual selection feedback, supports multiple fields, aggregation options work correctly, sort controls update generated code, field type badges (number/text) display
 
 ## Edge Case Handling
 

@@ -77,7 +77,7 @@ export interface Condition {
   field: string
   operator: ConditionOperator
   value: number | string
-  value2?: number
+  value2?: number | string
   logic?: ConditionLogic
 }
 
