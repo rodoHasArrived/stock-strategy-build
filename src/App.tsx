@@ -1031,7 +1031,9 @@ function App() {
                                   timestamp: t.timestamp,
                                   reason: t.reasonCode,
                                 })),
-                                totalExecutionTime: runTrace.reduce((sum, t) => sum + (t.timestamp - (runTrace[0]?.timestamp ?? t.timestamp)), 0),
+                                totalExecutionTime: runTrace.length > 1
+                                  ? runTrace[runTrace.length - 1].timestamp - runTrace[0].timestamp
+                                  : 0,
                                 success: true,
                                 finalVariables: executionContext.variables,
                                 branchPath: runTrace.map(t => t.cellIndex),
@@ -1059,7 +1061,7 @@ function App() {
                       <ScrollArea className="h-full">
                         <div className="pr-2">
                           <GovernancePanel
-                            governance={safeStrategy.governance!}
+                            governance={safeStrategy.governance ?? createDefaultGovernance()}
                             onGovernanceChange={handleGovernanceChange}
                             currentUser={currentUser?.login}
                           />

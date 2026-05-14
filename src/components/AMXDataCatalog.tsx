@@ -407,7 +407,7 @@ export function AMXDataCatalog({ onFieldSelect, selectedFields = [] }: AMXDataCa
   const [activeCategory, setActiveCategory] = useState<string>('all')
   const [expandedPayloads, setExpandedPayloads] = useState<Set<string>>(new Set())
 
-  const togglePayload = (id: string, e: React.MouseEvent) => {
+  const togglePayload = (id: string, e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
     setExpandedPayloads(prev => {
       const next = new Set(prev)
