@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { CodeCell as CodeCellType, CellMode, Condition, CellComment } from '@/lib/types'
+import { CodeCell as CodeCellType, CellMode, Condition, CellComment, CellContract } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon, ChatCircle, NoteBlank, DotsSixVertical } from '@phosphor-icons/react'
+import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon, ChatCircle, NoteBlank, DotsSixVertical, Article } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { VisualBuilder } from '@/components/VisualBuilder'
 import { DataFieldSelector } from '@/components/DataFieldSelector'
@@ -15,6 +15,8 @@ import { CellComments } from '@/components/CellComments'
 import { Input } from '@/components/ui/input'
 import { FormulaAutocomplete } from '@/components/FormulaAutocomplete'
 import { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
+import { CellContractEditor } from '@/components/CellContractEditor'
+import { CellContractDisplay } from '@/components/CellContractDisplay'
 
 interface CodeCellProps {
   cell: CodeCellType
@@ -48,6 +50,7 @@ export function CodeCellComponent({
 }: CodeCellProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [cellLabel, setCellLabel] = useState(cell.label || '')
+  const [showContractEditor, setShowContractEditor] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   
   const cellComments = comments.filter(c => c.cellId === cell.id)
@@ -121,6 +124,10 @@ export function CodeCellComponent({
     onCellChange({ mode })
   }
 
+  const handleContractChange = (contract: CellContract) => {
+    onCellChange({ contract })
+  }
+
   return (
     <Card 
       id={`cell-${cell.index}`}
@@ -184,6 +191,15 @@ export function CodeCellComponent({
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              size="sm"
+              variant={cell.contract ? "default" : "outline"}
+              onClick={() => setShowContractEditor(!showContractEditor)}
+              className="h-8"
+            >
+              <Article size={16} className="mr-1" weight={cell.contract ? "fill" : "regular"} />
+              Contract
+            </Button>
             {onAddComment && (
               <Sheet>
                 <SheetTrigger asChild>
@@ -245,6 +261,26 @@ export function CodeCellComponent({
             </Button>
           </div>
         </div>
+
+        {showContractEditor && (
+          <div className="mb-3">
+            <CellContractEditor
+              contract={cell.contract}
+              onChange={handleContractChange}
+              onClose={() => setShowContractEditor(false)}
+            />
+          </div>
+        )}
+
+        {!showContractEditor && cell.contract && (
+          <div className="mb-3">
+            <CellContractDisplay
+              contract={cell.contract}
+              validationResult={cell.validationResult}
+              compact={true}
+            />
+          </div>
+        )}
 
         <Tabs value={cell.mode} onValueChange={(value) => handleModeChange(value as CellMode)}>
           <TabsList className="grid w-full grid-cols-3">

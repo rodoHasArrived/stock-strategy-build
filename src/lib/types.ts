@@ -31,6 +31,57 @@ export interface Cell {
   isCalculating?: boolean
 }
 
+export type DataType = 'string' | 'number' | 'boolean' | 'array' | 'object' | 'dataframe' | 'series' | 'any'
+
+export type FailureBehavior = 'halt' | 'skip' | 'retry' | 'default' | 'warn'
+
+export interface TypedField {
+  name: string
+  type: DataType
+  required: boolean
+  description?: string
+  default?: any
+  validation?: ValidationRule[]
+}
+
+export interface ValidationRule {
+  id: string
+  type: 'range' | 'pattern' | 'custom' | 'required' | 'type' | 'length'
+  value?: any
+  value2?: any
+  customFn?: string
+  message?: string
+}
+
+export interface CellContract {
+  inputs: TypedField[]
+  outputs: TypedField[]
+  requiredContext: string[]
+  requiredFields: string[]
+  validation: ValidationRule[]
+  failureBehavior: FailureBehavior
+  retryConfig?: {
+    maxRetries: number
+    backoff: 'linear' | 'exponential'
+    fallbackValue?: any
+  }
+  description?: string
+  tags?: string[]
+}
+
+export interface ValidationResult {
+  valid: boolean
+  errors: Array<{
+    field: string
+    rule: string
+    message: string
+  }>
+  warnings: Array<{
+    field: string
+    message: string
+  }>
+}
+
 export interface CodeCell {
   id: string
   index: number
@@ -42,6 +93,8 @@ export interface CodeCell {
   mode: CellMode
   purpose: CellPurpose
   label?: string
+  contract?: CellContract
+  validationResult?: ValidationResult
   controlFlow?: {
     type: ControlFlowType
     target?: number
