@@ -868,6 +868,232 @@ __result__ = needs_rebalance
   },
   
   {
+    id: 'preferred-stock-arbitrage',
+    name: 'Preferred Stock Pairs Arbitrage',
+    description: 'Trade between two preferred stocks (PA/PB) based on yield spread mean reversion with dividend capture',
+    category: 'Trading',
+    strategy: {
+      name: 'Preferred Stock Pairs Arbitrage',
+      description: 'Trade between two preferred stocks (PA/PB) based on yield spread mean reversion with dividend capture',
+      cells: [
+        createCell(0, `symbol_A = 'PA'
+symbol_B = 'PB'
+coupon_A = 1.50
+coupon_B = 1.375
+lookback_period = 60
+min_lookback = 20
+z_enter_threshold = 0.25
+z_return_threshold = 0.75`, 'general', 'Strategy Parameters'),
+        
+        createCell(1, `price_A = PRICE(symbol_A)
+price_B = PRICE(symbol_B)
+yield_A = (coupon_A / price_A) * 100
+yield_B = (coupon_B / price_B) * 100
+__result__ = symbol_A + ': $' + price_A + ' (' + yield_A.toFixed(2) + '%) | ' + symbol_B + ': $' + price_B + ' (' + yield_B.toFixed(2) + '%)'`, 'data', 'Calculate Current Yields'),
+        
+        createCell(2, `yield_spread = yield_A - yield_B
+spread_history = ROLLING_HISTORY('yield_spread', lookback_period)
+__result__ = 'Yield spread: ' + yield_spread.toFixed(2) + 'bps | History length: ' + spread_history.length`, 'calculation', 'Compute Spread'),
+        
+        createCell(3, `if (spread_history.length >= min_lookback) {
+  spread_mean = spread_history.reduce((sum, v) => sum + v, 0) / spread_history.length
+  spread_std = Math.sqrt(spread_history.reduce((sum, v) => sum + Math.pow(v - spread_mean, 2), 0) / spread_history.length)
+  z_score = (yield_spread - spread_mean) / spread_std
+  __result__ = 'Z-Score: ' + z_score.toFixed(2) + ' | Mean: ' + spread_mean.toFixed(2) + ' | StdDev: ' + spread_std.toFixed(2)
+} else {
+  __result__ = 'Insufficient data (' + spread_history.length + '/' + min_lookback + ')'
+  next
+}`, 'calculation', 'Calculate Z-Score'),
+        
+        createCell(4, `current_holding = CURRENT_POSITION()
+target_position = current_holding
+
+if (!current_holding || current_holding === symbol_A) {
+  if (z_score < -z_enter_threshold) {
+    target_position = symbol_B
+    signal = 'SWITCH_TO_' + symbol_B + '_UNDERVALUED'
+  }
+} else if (current_holding === symbol_B) {
+  if (z_score > z_return_threshold) {
+    target_position = symbol_A
+    signal = 'RETURN_TO_' + symbol_A + '_NORMALIZED'
+  }
+}
+
+__result__ = 'Current: ' + (current_holding || 'Cash') + ' → Target: ' + target_position + ' | Signal: ' + (signal || 'HOLD')`, 'condition', 'Generate Signal'),
+        
+        createCell(5, `if (target_position !== current_holding) {
+  trades = []
+  if (current_holding) {
+    trades.push({ symbol: current_holding, action: 'sell', reason: signal, z_score })
+  }
+  if (target_position) {
+    trades.push({ symbol: target_position, action: 'buy', reason: signal, z_score })
+  }
+  __result__ = 'Executing ' + trades.length + ' trade(s): ' + trades.map(t => t.action + ' ' + t.symbol).join(', ')
+} else {
+  __result__ = 'No trades - holding ' + (current_holding || 'cash')
+}`, 'trade', 'Execute Trades')
+      ],
+      parameters: [
+        { id: 'p1', name: 'lookback_period', value: 60, type: 'number', description: 'Rolling window for spread statistics' },
+        { id: 'p2', name: 'z_enter_threshold', value: 0.25, type: 'number', description: 'Z-score to switch positions' },
+        { id: 'p3', name: 'z_return_threshold', value: 0.75, type: 'number', description: 'Z-score to return to base' }
+      ]
+    }
+  },
+  
+  {
+    id: 'sector-rotation-momentum',
+    name: 'Sector Rotation with Momentum',
+    description: 'Rotate capital across sectors based on relative momentum and trend strength signals',
+    category: 'Trading',
+    strategy: {
+      name: 'Sector Rotation with Momentum',
+      description: 'Rotate capital across sectors based on relative momentum and trend strength signals',
+      cells: [
+        createCell(0, `sectors = ['Technology', 'Healthcare', 'Financials', 'Energy', 'Industrials']
+lookback_period = 90
+momentum_threshold = 5.0
+max_sectors = 3
+rebalance_days = 30`, 'general', 'Configuration'),
+        
+        createCell(1, `sector_momentum = {}
+sectors.forEach(sector => {
+  securities_in_sector = securities.filter(s => s.name.includes(sector))
+  if (securities_in_sector.length > 0) {
+    avg_return = securities_in_sector.reduce((sum, s) => sum + (RETURN(s.cusip, lookback_period) || 0), 0) / securities_in_sector.length
+    sector_momentum[sector] = avg_return
+  }
+})
+__result__ = 'Calculated momentum for ' + Object.keys(sector_momentum).length + ' sectors'`, 'calculation', 'Calculate Sector Momentum'),
+        
+        createCell(2, `ranked_sectors = Object.entries(sector_momentum)
+  .sort((a, b) => b[1] - a[1])
+  .map(([sector, momentum]) => ({ sector, momentum }))
+  
+top_sectors = ranked_sectors.slice(0, max_sectors)
+__result__ = 'Top sectors: ' + top_sectors.map(s => s.sector + ' (' + s.momentum.toFixed(2) + '%)').join(', ')`, 'ranking', 'Rank Sectors'),
+        
+        createCell(3, `current_positions = GET_ALL_POSITIONS()
+trades = []
+
+top_sectors.forEach(sector_data => {
+  const sector = sector_data.sector
+  const in_sector = current_positions.filter(p => p.name.includes(sector))
+  
+  if (in_sector.length === 0 && sector_data.momentum > momentum_threshold) {
+    const best_security = securities
+      .filter(s => s.name.includes(sector))
+      .sort((a, b) => (b.yield || 0) - (a.yield || 0))[0]
+    
+    if (best_security) {
+      trades.push({
+        cusip: best_security.cusip,
+        action: 'buy',
+        reason: 'SECTOR_MOMENTUM_' + sector,
+        momentum: sector_data.momentum
+      })
+    }
+  }
+})
+
+__result__ = 'Generated ' + trades.length + ' rotation trades'`, 'trade', 'Generate Rotation Trades')
+      ],
+      parameters: [
+        { id: 'p1', name: 'lookback_period', value: 90, type: 'number', description: 'Momentum calculation window' },
+        { id: 'p2', name: 'momentum_threshold', value: 5.0, type: 'number', description: 'Minimum momentum %' },
+        { id: 'p3', name: 'max_sectors', value: 3, type: 'number', description: 'Max sectors to hold' }
+      ]
+    }
+  },
+  
+  {
+    id: 'volatility-adjusted-allocation',
+    name: 'Volatility-Adjusted Portfolio Allocation',
+    description: 'Dynamically allocate capital across assets inversely proportional to their volatility for risk parity',
+    category: 'Trading',
+    strategy: {
+      name: 'Volatility-Adjusted Portfolio Allocation',
+      description: 'Dynamically allocate capital across assets inversely proportional to their volatility for risk parity',
+      cells: [
+        createCell(0, `asset_universe = ['BOND_A', 'BOND_B', 'BOND_C', 'EQUITY_ETF']
+volatility_window = 60
+target_risk_contribution = 0.25
+min_allocation = 0.05
+max_allocation = 0.50
+rebalance_threshold = 0.10`, 'general', 'Risk Parity Parameters'),
+        
+        createCell(1, `asset_volatilities = {}
+asset_universe.forEach(asset => {
+  returns = RETURN_HISTORY(asset, volatility_window)
+  if (returns && returns.length >= 30) {
+    mean_return = returns.reduce((sum, r) => sum + r, 0) / returns.length
+    variance = returns.reduce((sum, r) => sum + Math.pow(r - mean_return, 2), 0) / returns.length
+    volatility = Math.sqrt(variance * 252)
+    asset_volatilities[asset] = volatility
+  }
+})
+__result__ = 'Calculated volatility for ' + Object.keys(asset_volatilities).length + ' assets'`, 'calculation', 'Calculate Asset Volatilities'),
+        
+        createCell(2, `inverse_volatilities = {}
+total_inverse_vol = 0
+
+Object.entries(asset_volatilities).forEach(([asset, vol]) => {
+  if (vol > 0) {
+    inverse_volatilities[asset] = 1 / vol
+    total_inverse_vol += 1 / vol
+  }
+})
+
+risk_parity_weights = {}
+Object.entries(inverse_volatilities).forEach(([asset, inv_vol]) => {
+  weight = inv_vol / total_inverse_vol
+  risk_parity_weights[asset] = Math.min(Math.max(weight, min_allocation), max_allocation)
+})
+
+__result__ = 'Risk parity weights: ' + Object.entries(risk_parity_weights).map(([a, w]) => a + '=' + (w * 100).toFixed(1) + '%').join(', ')`, 'portfolio', 'Compute Risk Parity Weights'),
+        
+        createCell(3, `current_positions = GET_ALL_POSITIONS()
+total_value = current_positions.reduce((sum, p) => sum + (p.shares * p.price), 0)
+
+current_weights = {}
+current_positions.forEach(p => {
+  current_weights[p.symbol] = (p.shares * p.price) / total_value
+})
+
+rebalance_trades = []
+Object.entries(risk_parity_weights).forEach(([asset, target_weight]) => {
+  const current_weight = current_weights[asset] || 0
+  const weight_diff = Math.abs(target_weight - current_weight)
+  
+  if (weight_diff > rebalance_threshold) {
+    const target_value = target_weight * total_value
+    const current_value = current_weight * total_value
+    const trade_value = target_value - current_value
+    
+    rebalance_trades.push({
+      asset,
+      action: trade_value > 0 ? 'buy' : 'sell',
+      value: Math.abs(trade_value),
+      current_weight: (current_weight * 100).toFixed(1) + '%',
+      target_weight: (target_weight * 100).toFixed(1) + '%',
+      reason: 'RISK_PARITY_REBALANCE'
+    })
+  }
+})
+
+__result__ = 'Generated ' + rebalance_trades.length + ' rebalancing trades'`, 'trade', 'Rebalance to Target Weights')
+      ],
+      parameters: [
+        { id: 'p1', name: 'volatility_window', value: 60, type: 'number', description: 'Volatility lookback days' },
+        { id: 'p2', name: 'target_risk_contribution', value: 0.25, type: 'number', description: 'Equal risk per asset' },
+        { id: 'p3', name: 'rebalance_threshold', value: 0.10, type: 'number', description: 'Weight drift to rebalance' }
+      ]
+    }
+  },
+
+  {
     id: 'high-yield-credit-rotation',
     name: 'High-Yield Credit Rotation Strategy',
     description: 'Advanced multi-stage strategy that rotates between high-yield bonds based on credit trends, yield spreads, and sector momentum with iterative optimization',

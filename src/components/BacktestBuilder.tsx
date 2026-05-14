@@ -285,6 +285,16 @@ return { action: 'hold', reason: \`Z-score (\${Z.toFixed(2)}) within range\` }
         <TabsContent value="results" className="space-y-4">
           {result ? (
             <>
+              <Card className="bg-accent/5 border-accent/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ChartLine size={24} className="text-accent" weight="duotone" />
+                    Equity Curve Visualization
+                  </CardTitle>
+                  <CardDescription>Interactive chart showing portfolio value evolution over the backtest period</CardDescription>
+                </CardHeader>
+              </Card>
+              
               <EquityCurveChart data={result.equity} startCapital={config.startCapital} />
 
               <div className="grid grid-cols-4 gap-4">

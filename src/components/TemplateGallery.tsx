@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { FolderOpen, ChartLine, TrendUp, ChartBar, Briefcase, CheckCircle } from '@phosphor-icons/react'
+import { FolderOpen, ChartLine, TrendUp, ChartBar, Briefcase, CheckCircle, Intersect } from '@phosphor-icons/react'
 import { strategyTemplates, getAllCategories } from '@/lib/templates'
 
 interface TemplateGalleryProps {
@@ -35,6 +35,8 @@ export function TemplateGallery({ onLoadTemplate }: TemplateGalleryProps) {
         return <TrendUp size={16} weight="duotone" />
       case 'Portfolio':
         return <Briefcase size={16} weight="duotone" />
+      case 'Trading':
+        return <Intersect size={16} weight="duotone" />
       default:
         return <ChartBar size={16} weight="duotone" />
     }
