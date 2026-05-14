@@ -92,12 +92,15 @@ export function CodeCellComponent({ cell, onCodeChange, onRun, onDelete, onCellC
   }
 
   return (
-    <Card className={cn(
-      'p-4 transition-all',
-      cell.status === 'error' && 'border-destructive',
-      cell.status === 'success' && 'border-success',
-      cell.status === 'running' && 'ring-2 ring-accent'
-    )}>
+    <Card 
+      id={`cell-${cell.index}`}
+      className={cn(
+        'p-4 transition-all scroll-mt-6',
+        cell.status === 'error' && 'border-destructive',
+        cell.status === 'success' && 'border-success',
+        cell.status === 'running' && 'ring-2 ring-accent'
+      )}
+    >
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

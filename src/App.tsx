@@ -4,11 +4,13 @@ import { CodeCell, Parameter, Strategy, ExecutionContext } from '@/lib/types'
 import { CodeCellComponent } from '@/components/CodeCellComponent'
 import { ParameterPanel } from '@/components/ParameterPanel'
 import { ContextInspector } from '@/components/ContextInspector'
+import { FlowDiagram } from '@/components/FlowDiagram'
 import { StrategyExecutor } from '@/lib/executor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { FloppyDisk, Code, Plus, PlayCircle } from '@phosphor-icons/react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { FloppyDisk, Code, Plus, PlayCircle, FlowArrow } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -41,6 +43,9 @@ function App() {
     maxIterations: 1000,
     iterationCount: 0
   })
+
+  const [highlightedCell, setHighlightedCell] = useState<number | undefined>(undefined)
+  const [activeTab, setActiveTab] = useState<string>('cells')
 
   const handleCellCodeChange = (index: number, code: string) => {
     setStrategy((current) => {
@@ -249,30 +254,56 @@ function App() {
       <div className="container mx-auto p-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Code Cells</h2>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <div className="flex items-center justify-between mb-4">
+                <TabsList>
+                  <TabsTrigger value="cells" className="gap-2">
+                    <Code size={16} />
+                    Code Cells
+                  </TabsTrigger>
+                  <TabsTrigger value="flow" className="gap-2">
+                    <FlowArrow size={16} />
+                    Execution Flow
+                  </TabsTrigger>
+                </TabsList>
                 <Button onClick={handleAddCell} size="sm" variant="outline">
                   <Plus size={16} className="mr-2" />
                   Add Cell
                 </Button>
               </div>
 
-              <ScrollArea className="h-[calc(100vh-220px)]">
-                <div className="space-y-4 pr-4">
-                  {strategy.cells.map((cell) => (
-                    <CodeCellComponent
-                      key={cell.id}
-                      cell={cell}
-                      onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
-                      onCellChange={(updates) => handleCellChange(cell.index, updates)}
-                      onRun={() => handleRunCell(cell.index)}
-                      onDelete={() => handleDeleteCell(cell.index)}
-                    />
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
+              <TabsContent value="cells" className="mt-0">
+                <ScrollArea className="h-[calc(100vh-240px)]">
+                  <div className="space-y-4 pr-4">
+                    {strategy.cells.map((cell) => (
+                      <CodeCellComponent
+                        key={cell.id}
+                        cell={cell}
+                        onCodeChange={(code) => handleCellCodeChange(cell.index, code)}
+                        onCellChange={(updates) => handleCellChange(cell.index, updates)}
+                        onRun={() => handleRunCell(cell.index)}
+                        onDelete={() => handleDeleteCell(cell.index)}
+                      />
+                    ))}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="flow" className="mt-0">
+                <FlowDiagram
+                  cells={strategy.cells}
+                  onCellClick={(index) => {
+                    setHighlightedCell(index)
+                    setActiveTab('cells')
+                    setTimeout(() => {
+                      const element = document.getElementById(`cell-${index}`)
+                      element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    }, 100)
+                  }}
+                  highlightedCell={highlightedCell}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
 
           <div className="lg:col-span-1 space-y-4">
