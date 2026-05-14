@@ -57,6 +57,14 @@ const createDefaultStrategy = (): Strategy => ({
   updatedAt: Date.now()
 })
 
+const getFieldInsertSeparator = (code: string, mode: ActiveInsertionTarget['mode']) => {
+  if (code.trim().length === 0) return ''
+  if (mode === 'code') {
+    return code.endsWith('\n') ? '' : '\n'
+  }
+  return ' '
+}
+
 function App() {
   const [strategy, setStrategy] = useKV<Strategy>('current-strategy', createDefaultStrategy())
   const [currentUser, setCurrentUser] = useState<{ login: string; avatarUrl: string } | undefined>(undefined)
@@ -405,15 +413,9 @@ function App() {
           : `${field.name} added to cell ${targetCell.index}`
       )
     } else {
-      const separator = targetCell.code.trim().length === 0
-        ? ''
-        : activeInsertionTarget.mode === 'code'
-          ? (targetCell.code.endsWith('\n') ? '' : '\n')
-          : ' '
-
       nextCells[activeInsertionTarget.cellIndex] = {
         ...targetCell,
-        code: `${targetCell.code}${separator}${fieldReference}`
+        code: `${targetCell.code}${getFieldInsertSeparator(targetCell.code, activeInsertionTarget.mode)}${fieldReference}`
       }
 
       toast.success(`${field.name} inserted into cell ${targetCell.index}`)
@@ -444,6 +446,16 @@ function App() {
   const activeInsertionSummary = activeInsertionCell
     ? `Cell ${activeInsertionCell.index} · ${activeInsertionTarget.mode === 'visual' ? 'Visual fields' : activeInsertionTarget.mode === 'formula' ? 'Formula editor' : 'Code editor'}`
     : 'Choose a cell to insert fields'
+
+  const renderInsertionTargetHint = () => (
+    <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3">
+      <div className="text-xs font-medium text-foreground">Insert target</div>
+      <div className="mt-1 text-sm">{activeInsertionSummary}</div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        Click a field to insert it, or drag it directly into a formula or code editor.
+      </div>
+    </div>
+  )
 
   const handleYieldFormulaGenerate = (formula: string) => {
     const newIndex = safeStrategy.cells.length
@@ -603,21 +615,15 @@ function App() {
           </TabsList>
           
           <ScrollArea className="h-[calc(100vh-120px)]">
-                       <TabsContent value="data" className="px-4 pb-4 mt-0">
-                         <div className="space-y-4">
-                           <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3">
-                             <div className="text-xs font-medium text-foreground">Insert target</div>
-                             <div className="mt-1 text-sm">{activeInsertionSummary}</div>
-                             <div className="mt-1 text-xs text-muted-foreground">
-                               Click a field to insert it, or drag it directly into a formula or code editor.
-                             </div>
-                           </div>
-                           <AMXDataCatalog
-                             onFieldSelect={handleFieldSelect}
-                             selectedFields={activeCatalogSelection}
-                           />
-                         </div>
-                       </TabsContent>
+            <TabsContent value="data" className="px-4 pb-4 mt-0">
+              <div className="space-y-4">
+                {renderInsertionTargetHint()}
+                <AMXDataCatalog
+                  onFieldSelect={handleFieldSelect}
+                  selectedFields={activeCatalogSelection}
+                />
+              </div>
+            </TabsContent>
             
             <TabsContent value="tools" className="px-4 pb-4 mt-0 space-y-4">
               <Accordion type="multiple" defaultValue={['yield', 'timeseries']} className="space-y-3">
@@ -706,21 +712,15 @@ function App() {
                     </TabsList>
                     
                     <ScrollArea className="h-[calc(100vh-160px)]">
-            <TabsContent value="data" className="px-4 pb-4 mt-0">
-              <div className="space-y-4">
-                <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3">
-                  <div className="text-xs font-medium text-foreground">Insert target</div>
-                  <div className="mt-1 text-sm">{activeInsertionSummary}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Click a field to insert it, or drag it directly into a formula or code editor.
-                  </div>
-                </div>
-                <AMXDataCatalog
-                  onFieldSelect={handleFieldSelect}
-                  selectedFields={activeCatalogSelection}
-                />
-              </div>
-            </TabsContent>
+                      <TabsContent value="data" className="px-4 pb-4 mt-0">
+                        <div className="space-y-4">
+                          {renderInsertionTargetHint()}
+                          <AMXDataCatalog
+                            onFieldSelect={handleFieldSelect}
+                            selectedFields={activeCatalogSelection}
+                          />
+                        </div>
+                      </TabsContent>
                       
                       <TabsContent value="tools" className="px-4 pb-4 mt-0 space-y-4">
                         <YieldCalculator onGenerateFormula={handleYieldFormulaGenerate} />

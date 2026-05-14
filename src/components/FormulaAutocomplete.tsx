@@ -204,6 +204,18 @@ export function FormulaAutocomplete({
 
   const relevantSuggestions = getRelevantSuggestions()
 
+  const commitInsertion = (nextValue: string, nextPosition: number) => {
+    onChange(nextValue)
+    setCursorPosition(nextPosition)
+
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus()
+        textareaRef.current.setSelectionRange(nextPosition, nextPosition)
+      }
+    }, 0)
+  }
+
   useEffect(() => {
     if (relevantSuggestions.length > 0) {
       setShowSuggestions(true)
@@ -243,15 +255,8 @@ export function FormulaAutocomplete({
       }
     }
     
-    onChange(newValue)
+    commitInsertion(newValue, newPosition)
     setShowSuggestions(false)
-    
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus()
-        textareaRef.current.setSelectionRange(newPosition, newPosition)
-      }
-    }, 0)
   }
 
   const insertAtCursor = (text: string) => {
@@ -266,13 +271,7 @@ export function FormulaAutocomplete({
     const nextValue = `${value.slice(0, start)}${text}${value.slice(end)}`
     const nextPosition = start + text.length
 
-    onChange(nextValue)
-    setCursorPosition(nextPosition)
-
-    setTimeout(() => {
-      textarea.focus()
-      textarea.setSelectionRange(nextPosition, nextPosition)
-    }, 0)
+    commitInsertion(nextValue, nextPosition)
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {

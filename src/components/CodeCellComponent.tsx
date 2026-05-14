@@ -442,7 +442,7 @@ export function CodeCellComponent({
                  <div className="space-y-2">
                    <div
                      className={cn(
-                       'overflow-hidden rounded-md border border-border bg-[#111827] transition-colors',
+                       'overflow-hidden rounded-md border border-border bg-slate-950 transition-colors',
                        isCodeDropTarget && 'border-accent ring-2 ring-accent/30'
                      )}
                      onDragOver={(e) => {
