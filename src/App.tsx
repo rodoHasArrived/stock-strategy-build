@@ -146,65 +146,163 @@ function App() {
   }
 
   const handleRunCell = async (index: number) => {
-    if (!strategy) return
+    if (!strategy || !Array.isArray(strategy.cells)) return
 
     const executor = new StrategyExecutor(strategy.cells, strategy.parameters)
     
     setStrategy((current) => {
-      const newCells = [...current!.cells]
+      if (!current || !Array.isArray(current.cells)) {
+        return {
+          id: 'default',
+          name: 'New Strategy',
+          description: '',
+          cells: [{
+            id: 'cell-0',
+            index: 0,
+            code: '',
+            output: '',
+            status: 'idle'
+          }],
+          parameters: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      }
+      const newCells = [...current.cells]
       newCells[index] = { ...newCells[index], status: 'running' }
-      return { ...current!, cells: newCells }
+      return { ...current, cells: newCells }
     })
 
     const result = await executor.executeCell(index)
     
     setStrategy((current) => {
-      const newCells = [...current!.cells]
+      if (!current || !Array.isArray(current.cells)) {
+        return {
+          id: 'default',
+          name: 'New Strategy',
+          description: '',
+          cells: [result],
+          parameters: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      }
+      const newCells = [...current.cells]
       newCells[index] = result
-      return { ...current!, cells: newCells, updatedAt: Date.now() }
+      return { ...current, cells: newCells, updatedAt: Date.now() }
     })
 
     setExecutionContext(executor.getContext())
   }
 
   const handleRunAll = async () => {
-    if (!strategy) return
+    if (!strategy || !Array.isArray(strategy.cells)) return
 
     toast.info('Running all cells...')
     
     const executor = new StrategyExecutor(strategy.cells, strategy.parameters)
     
-    setStrategy((current) => ({
-      ...current!,
-      cells: current!.cells.map(cell => ({ ...cell, status: 'running' as const }))
-    }))
+    setStrategy((current) => {
+      const defaultStrategy: Strategy = {
+        id: 'default',
+        name: 'New Strategy',
+        description: '',
+        cells: [{
+          id: 'cell-0',
+          index: 0,
+          code: '',
+          output: '',
+          status: 'idle'
+        }],
+        parameters: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+      
+      if (!current || !Array.isArray(current.cells)) return defaultStrategy
+      return {
+        ...current,
+        cells: current.cells.map(cell => ({ ...cell, status: 'running' as const }))
+      }
+    })
 
     const results = await executor.executeAll()
     
-    setStrategy((current) => ({
-      ...current!,
-      cells: results,
-      updatedAt: Date.now()
-    }))
+    setStrategy((current) => {
+      const defaultStrategy: Strategy = {
+        id: 'default',
+        name: 'New Strategy',
+        description: '',
+        cells: results,
+        parameters: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+      
+      if (!current) return defaultStrategy
+      return {
+        ...current,
+        cells: results,
+        updatedAt: Date.now()
+      }
+    })
 
     setExecutionContext(executor.getContext())
     toast.success('Execution complete')
   }
 
   const handleParametersChange = (parameters: Parameter[]) => {
-    setStrategy((current) => ({
-      ...current!,
-      parameters,
-      updatedAt: Date.now()
-    }))
+    setStrategy((current) => {
+      if (!current) {
+        return {
+          id: 'default',
+          name: 'New Strategy',
+          description: '',
+          cells: [{
+            id: 'cell-0',
+            index: 0,
+            code: '',
+            output: '',
+            status: 'idle'
+          }],
+          parameters,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      }
+      return {
+        ...current,
+        parameters,
+        updatedAt: Date.now()
+      }
+    })
   }
 
   const handleNameChange = (name: string) => {
-    setStrategy((current) => ({
-      ...current!,
-      name,
-      updatedAt: Date.now()
-    }))
+    setStrategy((current) => {
+      if (!current) {
+        return {
+          id: 'default',
+          name,
+          description: '',
+          cells: [{
+            id: 'cell-0',
+            index: 0,
+            code: '',
+            output: '',
+            status: 'idle'
+          }],
+          parameters: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      }
+      return {
+        ...current,
+        name,
+        updatedAt: Date.now()
+      }
+    })
   }
 
   const handleSaveStrategy = () => {
