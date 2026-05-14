@@ -18,6 +18,7 @@ The field picker includes:
 - 🏷️ Type badges (number, text, date, percentage)
 - 📁 Organized by category (Market, Fixed Income, Risk, etc.)
 - 💡 Descriptions and example values
+- 🖱️ Click-to-insert and drag-and-drop into the active formula or code cell
 
 ### 2. Formula Autocomplete
 Start typing a formula and get instant suggestions:
@@ -42,6 +43,8 @@ Features:
 5. **Navigate with arrow keys and press Enter to insert**
 
 Or use the **Visual mode** and click the field picker to search for fields visually!
+
+You can also click AMX fields in the sidebar to send them into the active cell, or drag them directly into the formula/code editor where you want them inserted.
 
 ## 🧠 How It Works
 

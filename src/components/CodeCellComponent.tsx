@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState } from 'react'
+import { lazy, Suspense, useCallback, useRef, useState } from 'react'
 import { CodeCell as CodeCellType, CellMode, Condition, CellComment, CellContract } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -36,6 +36,8 @@ interface CodeCellProps {
     avatarUrl: string
   }
   dragHandleProps?: DraggableProvidedDragHandleProps | null
+  onActivate?: (mode: CellMode) => void
+  isActive?: boolean
 }
 
 export function CodeCellComponent({ 
@@ -50,10 +52,14 @@ export function CodeCellComponent({
   onDeleteComment,
   onResolveComment,
   currentUser,
-  dragHandleProps
+  dragHandleProps,
+  onActivate,
+  isActive = false
 }: CodeCellProps) {
   const [cellLabel, setCellLabel] = useState(cell.label || '')
   const [showContractEditor, setShowContractEditor] = useState(false)
+  const [isCodeDropTarget, setIsCodeDropTarget] = useState(false)
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   
   const cellComments = comments.filter(c => c.cellId === cell.id)
   const unresolvedComments = cellComments.filter(c => !c.parentId && !c.resolved).length
@@ -120,21 +126,57 @@ export function CodeCellComponent({
     onCellChange({ mode })
   }
 
+  const setActiveMode = (mode: CellMode) => {
+    onActivate?.(mode)
+  }
+
   const handleContractChange = (contract: CellContract) => {
     onCellChange({ contract })
   }
 
   const handleCodeEditorMount = useCallback<OnMount>((editor, monaco) => {
+    editorRef.current = editor
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       onRun()
     })
   }, [onRun])
 
+  const insertIntoCodeEditor = useCallback((snippet: string) => {
+    const editor = editorRef.current
+    if (!editor) {
+      onCodeChange(cell.code ? `${cell.code}${cell.code.endsWith('\n') ? '' : '\n'}${snippet}` : snippet)
+      return
+    }
+
+    const selection = editor.getSelection()
+    if (!selection) {
+      onCodeChange(cell.code ? `${cell.code}${cell.code.endsWith('\n') ? '' : '\n'}${snippet}` : snippet)
+      return
+    }
+
+    editor.executeEdits('amx-field-drop', [
+      {
+        range: selection,
+        text: snippet,
+        forceMoveMarkers: true,
+      },
+    ])
+
+    const model = editor.getModel()
+    if (model) {
+      onCodeChange(model.getValue())
+    }
+    editor.focus()
+  }, [cell.code, onCodeChange])
+
   return (
     <Card 
       id={`cell-${cell.index}`}
+      onClick={() => setActiveMode(cell.mode)}
+      onFocusCapture={() => setActiveMode(cell.mode)}
       className={cn(
         'p-4 transition-all scroll-mt-6',
+        isActive && 'ring-2 ring-accent/35 border-accent/60',
         cell.status === 'error' && 'border-destructive',
         cell.status === 'success' && 'border-success',
         cell.status === 'running' && 'ring-2 ring-accent'
@@ -323,7 +365,14 @@ export function CodeCellComponent({
               </div>
             )}
 
-            <Tabs value={cell.mode} onValueChange={(value) => handleModeChange(value as CellMode)}>
+            <Tabs
+              value={cell.mode}
+              onValueChange={(value) => {
+                const nextMode = value as CellMode
+                handleModeChange(nextMode)
+                setActiveMode(nextMode)
+              }}
+            >
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="visual" className="text-xs">
                   <Shapes size={14} className="mr-1" />
@@ -371,25 +420,46 @@ export function CodeCellComponent({
               <TabsContent value="formula" className="mt-3">
                 <div className="space-y-2">
                   <FormulaAutocomplete
-                    value={cell.code}
-                    onChange={onCodeChange}
-                    onRun={onRun}
-                    placeholder="Enter formula... (e.g., current_yield = )"
-                    className="min-h-[80px] bg-muted/30"
-                    id={`cell-formula-${cell.index}`}
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    Start typing a variable name (e.g., "current_yield = ") to see formula suggestions
-                  </div>
-                </div>
-              </TabsContent>
+                     value={cell.code}
+                     onChange={onCodeChange}
+                     onRun={onRun}
+                     onActivate={() => setActiveMode('formula')}
+                     placeholder="Enter formula... (e.g., current_yield = )"
+                     className="min-h-[80px] bg-muted/30"
+                     id={`cell-formula-${cell.index}`}
+                   />
+                   <div className="text-xs text-muted-foreground">
+                     Start typing for suggestions, or drag AMX fields here to insert them at the cursor
+                   </div>
+                 </div>
+               </TabsContent>
 
-              <TabsContent value="code" className="mt-3">
-                <div className="space-y-2">
-                  <div className="overflow-hidden rounded-md border border-border bg-[#111827]">
-                    <Suspense fallback={<div role="status" aria-live="polite" className="flex h-[320px] items-center justify-center text-sm text-muted-foreground">Loading code editor…</div>}>
-                      <MonacoEditor
-                        height="320px"
+               <TabsContent value="code" className="mt-3">
+                 <div className="space-y-2">
+                   <div
+                     className={cn(
+                       'overflow-hidden rounded-md border border-border bg-[#111827] transition-colors',
+                       isCodeDropTarget && 'border-accent ring-2 ring-accent/30'
+                     )}
+                     onClick={() => setActiveMode('code')}
+                     onDragOver={(e) => {
+                       e.preventDefault()
+                       e.dataTransfer.dropEffect = 'copy'
+                       setIsCodeDropTarget(true)
+                       setActiveMode('code')
+                     }}
+                     onDragLeave={() => setIsCodeDropTarget(false)}
+                     onDrop={(e) => {
+                       e.preventDefault()
+                       const droppedText = e.dataTransfer.getData('text/plain').trim()
+                       setIsCodeDropTarget(false)
+                       if (!droppedText) return
+                       insertIntoCodeEditor(droppedText)
+                     }}
+                   >
+                     <Suspense fallback={<div role="status" aria-live="polite" className="flex h-[320px] items-center justify-center text-sm text-muted-foreground">Loading code editor…</div>}>
+                       <MonacoEditor
+                         height="320px"
                         defaultLanguage="python"
                         path={`${cell.id}.py`}
                         value={cell.code}
@@ -413,7 +483,7 @@ export function CodeCellComponent({
                     </Suspense>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Code editor with syntax highlighting and IntelliSense. Press Cmd/Ctrl+Enter to run.
+                     Code editor with syntax highlighting. Drag fields in or press Cmd/Ctrl+Enter to run.
                   </div>
                 </div>
               </TabsContent>

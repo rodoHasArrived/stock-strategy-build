@@ -143,6 +143,7 @@ interface FormulaAutocompleteProps {
   className?: string
   disabled?: boolean
   id?: string
+  onActivate?: () => void
 }
 
 export function FormulaAutocomplete({
@@ -152,11 +153,13 @@ export function FormulaAutocomplete({
   placeholder = 'Enter formula...',
   className,
   disabled = false,
-  id
+  id,
+  onActivate
 }: FormulaAutocompleteProps) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [cursorPosition, setCursorPosition] = useState(0)
+  const [isDragOver, setIsDragOver] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
@@ -251,6 +254,27 @@ export function FormulaAutocomplete({
     }, 0)
   }
 
+  const insertAtCursor = (text: string) => {
+    if (!textareaRef.current) {
+      onChange(value ? `${value}${value.endsWith('\n') ? '' : '\n'}${text}` : text)
+      return
+    }
+
+    const textarea = textareaRef.current
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const nextValue = `${value.slice(0, start)}${text}${value.slice(end)}`
+    const nextPosition = start + text.length
+
+    onChange(nextValue)
+    setCursorPosition(nextPosition)
+
+    setTimeout(() => {
+      textarea.focus()
+      textarea.setSelectionRange(nextPosition, nextPosition)
+    }, 0)
+  }
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (!showSuggestions || relevantSuggestions.length === 0) {
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && onRun) {
@@ -285,6 +309,17 @@ export function FormulaAutocomplete({
     }
   }
 
+  const handleDrop = (e: React.DragEvent<HTMLTextAreaElement>) => {
+    e.preventDefault()
+    const droppedText = e.dataTransfer.getData('text/plain').trim()
+    setIsDragOver(false)
+
+    if (!droppedText) return
+
+    onActivate?.()
+    insertAtCursor(droppedText)
+  }
+
   const getCategoryColor = (category: FormulaSuggestion['category']) => {
     switch (category) {
       case 'yield': return 'bg-green-500/10 text-green-700 border-green-200'
@@ -302,11 +337,24 @@ export function FormulaAutocomplete({
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onActivate}
         onKeyDown={handleKeyDown}
         onKeyUp={handleCursorChange}
         onClick={handleCursorChange}
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'copy'
+          setIsDragOver(true)
+          onActivate?.()
+        }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={handleDrop}
         placeholder={placeholder}
-        className={cn('font-mono text-sm resize-none', className)}
+        className={cn(
+          'font-mono text-sm resize-none transition-colors',
+          isDragOver && 'border-accent bg-accent/5 ring-2 ring-accent/30',
+          className
+        )}
         disabled={disabled}
         rows={4}
       />
