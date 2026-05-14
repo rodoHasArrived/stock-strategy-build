@@ -35,24 +35,25 @@ interface TransitionEditorProps {
   cellCount: number
 }
 
-const ROUTE_ACTION_LABELS: Record<TransitionRule['action'], { label: string; icon: React.ReactNode; color: string }> = {
-  next: { label: 'Go to Next', icon: <ArrowRight size={14} />, color: '' },
-  goto: { label: 'Go to Cell…', icon: <ArrowRight size={14} />, color: '' },
-  loop: { label: 'Create Loop', icon: <ArrowsClockwise size={14} />, color: '' },
-  while: { label: 'While Loop', icon: <ArrowsClockwise size={14} />, color: '' },
-  for_each: { label: 'For Each', icon: <ArrowsClockwise size={14} />, color: 'text-accent' },
-  retry: { label: 'Retry', icon: <ArrowBendUpLeft size={14} />, color: 'text-primary' },
-  stop: { label: 'Stop', icon: <XCircle size={14} />, color: '' },
-  pass: { label: 'Pass ✓', icon: <CheckCircle size={14} className="text-success" />, color: 'text-success' },
-  fail: { label: 'Fail ✗', icon: <XCircle size={14} className="text-destructive" />, color: 'text-destructive' },
-  missing_data: { label: 'Missing Data ?', icon: <Question size={14} className="text-warning" />, color: 'text-warning' },
-  error: { label: 'Error ⚠', icon: <Bug size={14} className="text-destructive" />, color: 'text-destructive' },
-  on_error: { label: 'On Error →', icon: <Bug size={14} />, color: 'text-destructive' },
+const ROUTE_ACTION_LABELS: Record<TransitionRule['action'], { label: string; description: string; icon: React.ReactNode; color: string }> = {
+  next: { label: 'Go to Next', description: 'Continue to the next cell in sequence', icon: <ArrowRight size={14} />, color: '' },
+  goto: { label: 'Go to Cell…', description: 'Jump to a specific cell (forward or backward)', icon: <ArrowRight size={14} />, color: '' },
+  loop: { label: 'Create Loop', description: 'Repeat a range of cells with exit condition', icon: <ArrowsClockwise size={14} />, color: '' },
+  while: { label: 'While Loop', description: 'Jump back to target while condition is true', icon: <ArrowsClockwise size={14} />, color: '' },
+  for_each: { label: 'For Each', description: 'Iterate over a collection and run cells for each item', icon: <ArrowsClockwise size={14} />, color: 'text-accent' },
+  retry: { label: 'Retry', description: 'Retry the current cell on transient errors', icon: <ArrowBendUpLeft size={14} />, color: 'text-primary' },
+  stop: { label: 'Stop', description: 'Halt execution immediately', icon: <XCircle size={14} />, color: '' },
+  pass: { label: 'Pass ✓', description: 'Mark this path as successful validation', icon: <CheckCircle size={14} className="text-success" />, color: 'text-success' },
+  fail: { label: 'Fail ✗', description: 'Mark this path as failed validation', icon: <XCircle size={14} className="text-destructive" />, color: 'text-destructive' },
+  missing_data: { label: 'Missing Data ?', description: 'Handle missing or incomplete data', icon: <Question size={14} className="text-warning" />, color: 'text-warning' },
+  error: { label: 'Error ⚠', description: 'Handle unexpected errors or exceptions', icon: <Bug size={14} className="text-destructive" />, color: 'text-destructive' },
+  on_error: { label: 'On Error →', description: 'Route errors to a specific error-handling cell', icon: <Bug size={14} />, color: 'text-destructive' },
 }
 
 export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellCount }: TransitionEditorProps) {
   const [mode, setMode] = useState<'simple' | 'advanced'>('simple')
   const [showVisualization, setShowVisualization] = useState(true)
+  const [showHelp, setShowHelp] = useState(false)
 
   const addRule = () => {
     const newRule: TransitionRule = {
@@ -406,34 +407,107 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-2">
-                        <Label className="text-xs">Then</Label>
-                        <Select
-                          value={rule.action}
-                          onValueChange={(value: TransitionRule['action']) => 
-                            updateRule(rule.id, { action: value })
-                          }
-                        >
-                          <SelectTrigger className="h-9 text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="next">Go to Next</SelectItem>
-                            <SelectItem value="goto">Go to Cell...</SelectItem>
-                            <SelectItem value="loop">Create Loop</SelectItem>
-                            <SelectItem value="while">While Loop</SelectItem>
-                            <SelectItem value="for_each">For Each</SelectItem>
-                            <SelectItem value="retry">Retry</SelectItem>
-                            <SelectItem value="on_error">On Error →</SelectItem>
-                            <SelectItem value="stop">Stop</SelectItem>
-                            <SelectItem value="pass">Pass ✓</SelectItem>
-                            <SelectItem value="fail">Fail ✗</SelectItem>
-                            <SelectItem value="missing_data">Missing Data ?</SelectItem>
-                            <SelectItem value="error">Error ⚠</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Then</Label>
+                      <Select
+                        value={rule.action}
+                        onValueChange={(value: TransitionRule['action']) => 
+                          updateRule(rule.id, { action: value })
+                        }
+                      >
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[400px]">
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Control Flow</div>
+                          <SelectItem value="next">
+                            <div className="flex items-center gap-2">
+                              <ArrowRight size={14} />
+                              <span>Go to Next</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="goto">
+                            <div className="flex items-center gap-2">
+                              <ArrowRight size={14} />
+                              <span>Go to Cell...</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="stop">
+                            <div className="flex items-center gap-2">
+                              <XCircle size={14} />
+                              <span>Stop</span>
+                            </div>
+                          </SelectItem>
+                          <Separator className="my-1" />
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Loops & Iteration</div>
+                          <SelectItem value="loop">
+                            <div className="flex items-center gap-2">
+                              <ArrowsClockwise size={14} />
+                              <span>Create Loop</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="while">
+                            <div className="flex items-center gap-2">
+                              <ArrowsClockwise size={14} />
+                              <span>While Loop</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="for_each">
+                            <div className="flex items-center gap-2">
+                              <ArrowsClockwise size={14} className="text-accent" />
+                              <span>For Each</span>
+                            </div>
+                          </SelectItem>
+                          <Separator className="my-1" />
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Error Handling</div>
+                          <SelectItem value="retry">
+                            <div className="flex items-center gap-2">
+                              <ArrowBendUpLeft size={14} className="text-primary" />
+                              <span>Retry</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="on_error">
+                            <div className="flex items-center gap-2">
+                              <Bug size={14} className="text-destructive" />
+                              <span>On Error →</span>
+                            </div>
+                          </SelectItem>
+                          <Separator className="my-1" />
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Validation Paths</div>
+                          <SelectItem value="pass">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle size={14} className="text-success" />
+                              <span>Pass ✓</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="fail">
+                            <div className="flex items-center gap-2">
+                              <XCircle size={14} className="text-destructive" />
+                              <span>Fail ✗</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="missing_data">
+                            <div className="flex items-center gap-2">
+                              <Question size={14} className="text-warning" />
+                              <span>Missing Data ?</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="error">
+                            <div className="flex items-center gap-2">
+                              <Bug size={14} className="text-destructive" />
+                              <span>Error ⚠</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {rule.action && ROUTE_ACTION_LABELS[rule.action]?.description && (
+                        <p className="text-[10px] text-muted-foreground leading-tight">
+                          {ROUTE_ACTION_LABELS[rule.action].description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2">
 
                       {(rule.action === 'goto' || rule.action === 'while' || rule.action === 'on_error') && (
                         <div className="space-y-2">
@@ -458,6 +532,65 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
                         </div>
                       )}
                     </div>
+
+                    {rule.action === 'while' && (
+                      <div className="space-y-2 pt-2 border-t">
+                        <Label className="text-xs font-semibold">While Loop Configuration</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground font-semibold">Loop Condition <span className="text-destructive">*</span></Label>
+                          <Input
+                            placeholder="e.g., portfolio.duration > max_duration"
+                            value={rule.condition || ''}
+                            onChange={(e) => updateRule(rule.id, { condition: e.target.value })}
+                            className="h-8 text-xs font-mono"
+                            id={`while-condition-${rule.id}`}
+                          />
+                          <p className="text-[10px] text-muted-foreground">Loop continues while this condition is true</p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground font-semibold">Max Iterations <span className="text-destructive">*</span></Label>
+                          <Input
+                            type="number"
+                            placeholder="100"
+                            value={rule.loopConfig?.maxIterations || ''}
+                            onChange={(e) => 
+                              updateRule(rule.id, { 
+                                loopConfig: { 
+                                  ...rule.loopConfig,
+                                  startCell: rule.loopConfig?.startCell || fromCell,
+                                  endCell: rule.loopConfig?.endCell || fromCell,
+                                  maxIterations: parseInt(e.target.value) || 100
+                                } 
+                              })
+                            }
+                            className="h-8 text-xs"
+                            id={`while-max-iterations-${rule.id}`}
+                          />
+                          <p className="text-[10px] text-muted-foreground">Safety limit to prevent infinite loops</p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Iterator Variable (optional)</Label>
+                          <Input
+                            placeholder="e.g., loop_count"
+                            value={rule.loopConfig?.iteratorVariable || ''}
+                            onChange={(e) => 
+                              updateRule(rule.id, { 
+                                loopConfig: { 
+                                  ...rule.loopConfig,
+                                  startCell: rule.loopConfig?.startCell || fromCell,
+                                  endCell: rule.loopConfig?.endCell || fromCell,
+                                  maxIterations: rule.loopConfig?.maxIterations || 100,
+                                  iteratorVariable: e.target.value
+                                } 
+                              })
+                            }
+                            className="h-8 text-xs font-mono"
+                            id={`while-iterator-variable-${rule.id}`}
+                          />
+                          <p className="text-[10px] text-muted-foreground">Variable to track iteration count</p>
+                        </div>
+                      </div>
+                    )}
 
                     {isBackwardJump && (
                       <div className="space-y-1 pt-2 border-t border-destructive/20">
@@ -825,7 +958,79 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
           </div>
         </TabsContent>
 
-        <div className="flex items-center justify-center pt-2">
+        {showHelp && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Info size={16} className="text-accent" />
+                Transition Examples & Use Cases
+              </div>
+              <div className="space-y-3 text-xs">
+                <div className="p-3 rounded-md bg-muted/30 border border-border/50">
+                  <div className="font-semibold mb-1 flex items-center gap-1.5">
+                    <CheckCircle size={12} className="text-success" />
+                    Conditional Branching
+                  </div>
+                  <div className="text-muted-foreground">
+                    Use <strong>IF / ELSE</strong> with conditions like <code className="px-1 py-0.5 bg-background rounded">current_yield &gt;= 5.0</code> to route securities based on metrics
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-md bg-muted/30 border border-border/50">
+                  <div className="font-semibold mb-1 flex items-center gap-1.5">
+                    <ArrowsClockwise size={12} className="text-warning" />
+                    Portfolio Rebalancing
+                  </div>
+                  <div className="text-muted-foreground">
+                    Use <strong>While Loop</strong> to iteratively adjust positions until constraints are met (e.g., <code className="px-1 py-0.5 bg-background rounded">portfolio.duration &gt; max_duration</code>)
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-md bg-muted/30 border border-border/50">
+                  <div className="font-semibold mb-1 flex items-center gap-1.5">
+                    <ArrowsClockwise size={12} className="text-accent" />
+                    Security-Level Processing
+                  </div>
+                  <div className="text-muted-foreground">
+                    Use <strong>For Each</strong> to run cells for each security, sector, or portfolio independently
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-md bg-muted/30 border border-border/50">
+                  <div className="font-semibold mb-1 flex items-center gap-1.5">
+                    <Bug size={12} className="text-destructive" />
+                    Error Recovery
+                  </div>
+                  <div className="text-muted-foreground">
+                    Use <strong>On Error</strong> to route failures to diagnostic cells, or <strong>Retry</strong> for transient data issues
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-md bg-muted/30 border border-border/50">
+                  <div className="font-semibold mb-1 flex items-center gap-1.5">
+                    <Question size={12} className="text-warning" />
+                    Data Validation
+                  </div>
+                  <div className="text-muted-foreground">
+                    Use <strong>Missing Data</strong>, <strong>Pass</strong>, and <strong>Fail</strong> paths to explicitly handle validation outcomes
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        <div className="flex items-center justify-center pt-2 gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowHelp(!showHelp)}
+            className="h-7 text-xs text-muted-foreground"
+          >
+            <Info size={14} className="mr-1" />
+            {showHelp ? 'Hide' : 'Show'} Examples
+          </Button>
           <ArrowDown size={16} className="text-muted-foreground" />
         </div>
       </div>
