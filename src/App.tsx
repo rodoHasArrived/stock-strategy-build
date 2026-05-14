@@ -603,7 +603,7 @@ function App() {
           </h2>
         </div>
         <Tabs value={leftPanelTab} onValueChange={(v) => setLeftPanelTab(v as 'data' | 'tools')} className="flex-1">
-          <TabsList className="w-full grid grid-cols-2 m-4">
+          <TabsList className="w-[calc(100%-2rem)] mx-4 grid grid-cols-2">
             <TabsTrigger value="data">
               <Database size={14} className="mr-2" />
               AMX Data
