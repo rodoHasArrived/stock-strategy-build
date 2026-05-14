@@ -525,6 +525,261 @@ __result__ = 'Portfolio duration: ' + portfolio_duration.toFixed(2) + (duration_
       ],
       parameters: []
     }
+  },
+  
+  {
+    id: 'high-yield-credit-rotation',
+    name: 'High-Yield Credit Rotation Strategy',
+    description: 'Advanced multi-stage strategy that rotates between high-yield bonds based on credit trends, yield spreads, and sector momentum with iterative optimization',
+    category: 'Fixed Income',
+    strategy: {
+      name: 'High-Yield Credit Rotation Strategy',
+      description: 'Advanced multi-stage strategy that rotates between high-yield bonds based on credit trends, yield spreads, and sector momentum with iterative optimization',
+      cells: [
+        createCell(0, `min_yield = 6.0
+max_yield = 12.0
+min_spread = 300
+max_spread = 700
+target_duration = 4.5
+duration_tolerance = 1.5
+max_position_weight = 3.0
+max_sector_weight = 25.0
+max_issuer_weight = 5.0
+target_portfolio_size = 30
+min_liquidity_score = 50
+rebalance_threshold = 2.5
+max_iterations = 5`, 'general', 'Strategy Parameters'),
+        
+        createCell(1, `high_yield_universe = securities.filter(s => 
+  s.rating >= 'BB' && 
+  s.rating <= 'B' &&
+  s.yield >= min_yield &&
+  s.yield <= max_yield
+)
+universe_count = high_yield_universe.length
+__result__ = 'Universe: ' + universe_count + ' high-yield bonds (BB to B rating)'`, 'universe', 'Define High-Yield Universe'),
+        
+        createCell(2, `if (universe_count === 0) {
+  __result__ = 'ERROR: No securities in universe - stopping execution'
+  goto: 'stop'
+} else if (universe_count < target_portfolio_size) {
+  __result__ = 'WARNING: Only ' + universe_count + ' securities available (target: ' + target_portfolio_size + ')'
+  next
+} else {
+  __result__ = 'Sufficient universe size - continuing to analysis'
+  next
+}`, 'condition', 'Validate Universe Size'),
+        
+        createCell(3, `enriched_universe = high_yield_universe.map(s => {
+  const annual_coupon = s.coupon * 1000
+  const current_yield = (annual_coupon / s.price) * 100
+  const ytm_estimate = current_yield + ((1000 - s.price) / (s.duration || 5)) / s.price * 100
+  const spread_to_benchmark = s.spread || (s.yield - 3.5) * 100
+  
+  return {
+    ...s,
+    current_yield: current_yield,
+    ytm_estimate: ytm_estimate,
+    spread_bps: spread_to_benchmark,
+    duration_adjusted_yield: s.yield / (s.duration || 4.5)
+  }
+})
+__result__ = 'Calculated yield metrics for ' + enriched_universe.length + ' securities'`, 'calculation', 'Calculate Yield Metrics'),
+        
+        createCell(4, `spread_filtered = enriched_universe.filter(s => 
+  s.spread_bps >= min_spread && 
+  s.spread_bps <= max_spread
+)
+duration_filtered = spread_filtered.filter(s =>
+  Math.abs(s.duration - target_duration) <= duration_tolerance
+)
+__result__ = 'After filters: ' + duration_filtered.length + ' securities (spread: ' + spread_filtered.length + ', duration: ' + duration_filtered.length + ')'`, 'condition', 'Apply Spread & Duration Filters'),
+        
+        createCell(5, `scored_securities = duration_filtered.map(s => {
+  const yield_score = (s.yield - min_yield) / (max_yield - min_yield) * 40
+  const spread_score = (s.spread_bps - min_spread) / (max_spread - min_spread) * 30
+  const duration_score = (1 - Math.abs(s.duration - target_duration) / duration_tolerance) * 15
+  const liquidity_score = Math.min(s.yield / max_yield * 100, 100) * 0.15
+  
+  const composite_score = yield_score + spread_score + duration_score + liquidity_score
+  
+  return {
+    ...s,
+    yield_score,
+    spread_score,
+    duration_score,
+    liquidity_score,
+    composite_score
+  }
+})
+
+ranked_securities = scored_securities.sort((a, b) => b.composite_score - a.composite_score)
+__result__ = 'Scored and ranked ' + ranked_securities.length + ' securities by composite metric'`, 'ranking', 'Multi-Factor Scoring'),
+        
+        createCell(6, `top_securities = ranked_securities.slice(0, target_portfolio_size * 2)
+
+sector_exposures = {}
+issuer_exposures = {}
+
+top_securities.forEach(s => {
+  const sector = s.name.split(' ')[0]
+  const issuer = s.name.split(' ')[0]
+  sector_exposures[sector] = (sector_exposures[sector] || 0) + 1
+  issuer_exposures[issuer] = (issuer_exposures[issuer] || 0) + 1
+})
+
+overweight_sectors = Object.keys(sector_exposures).filter(sector => 
+  (sector_exposures[sector] / top_securities.length * 100) > max_sector_weight
+)
+overweight_issuers = Object.keys(issuer_exposures).filter(issuer => 
+  (issuer_exposures[issuer] / top_securities.length * 100) > max_issuer_weight
+)
+
+__result__ = 'Pre-check: ' + overweight_sectors.length + ' overweight sectors, ' + overweight_issuers.length + ' overweight issuers'`, 'risk', 'Pre-Allocation Risk Check'),
+        
+        createCell(7, `iteration = 0
+max_iterations_reached = false
+portfolio_compliant = false
+current_portfolio = []`, 'general', 'Initialize Optimization Loop'),
+        
+        createCell(8, `iteration = iteration + 1
+
+if (iteration > max_iterations) {
+  max_iterations_reached = true
+  __result__ = 'Max iterations (' + max_iterations + ') reached - using best available portfolio'
+} else {
+  current_portfolio = []
+  sector_weights = {}
+  issuer_weights = {}
+  
+  for (let i = 0; i < ranked_securities.length && current_portfolio.length < target_portfolio_size; i++) {
+    const security = ranked_securities[i]
+    const sector = security.name.split(' ')[0]
+    const issuer = security.name.split(' ')[0]
+    
+    const projected_sector_weight = ((sector_weights[sector] || 0) + 1) / (current_portfolio.length + 1) * 100
+    const projected_issuer_weight = ((issuer_weights[issuer] || 0) + 1) / (current_portfolio.length + 1) * 100
+    
+    if (projected_sector_weight <= max_sector_weight && projected_issuer_weight <= max_issuer_weight) {
+      current_portfolio.push(security)
+      sector_weights[sector] = (sector_weights[sector] || 0) + 1
+      issuer_weights[issuer] = (issuer_weights[issuer] || 0) + 1
+    }
+  }
+  
+  __result__ = 'Iteration ' + iteration + ': Built portfolio with ' + current_portfolio.length + ' securities'
+}`, 'optimization', 'Construct Constrained Portfolio'),
+        
+        createCell(9, `if (max_iterations_reached || current_portfolio.length >= target_portfolio_size * 0.9) {
+  portfolio_compliant = true
+  __result__ = 'Portfolio construction complete with ' + current_portfolio.length + ' securities'
+} else {
+  __result__ = 'Portfolio only has ' + current_portfolio.length + ' securities - adjusting constraints'
+  max_sector_weight = max_sector_weight + 2.5
+  max_issuer_weight = max_issuer_weight + 1.0
+  goto: 8
+}`, 'condition', 'Validate Portfolio & Loop'),
+        
+        createCell(10, `equal_weight = 100 / current_portfolio.length
+position_weights = {}
+
+final_portfolio = current_portfolio.map(s => {
+  position_weights[s.cusip] = equal_weight
+  return {
+    cusip: s.cusip,
+    name: s.name,
+    weight: equal_weight,
+    yield: s.yield,
+    duration: s.duration,
+    rating: s.rating,
+    score: s.composite_score
+  }
+})
+
+portfolio_duration = final_portfolio.reduce((sum, p) => sum + (p.duration * p.weight / 100), 0)
+portfolio_yield = final_portfolio.reduce((sum, p) => sum + (p.yield * p.weight / 100), 0)
+
+__result__ = 'Allocated equal weight (' + equal_weight.toFixed(2) + '%) to ' + final_portfolio.length + ' positions'`, 'portfolio', 'Allocate Portfolio Weights'),
+        
+        createCell(11, `duration_breach = Math.abs(portfolio_duration - target_duration) > duration_tolerance
+sector_breach = false
+issuer_breach = false
+
+final_sector_weights = {}
+final_issuer_weights = {}
+
+final_portfolio.forEach(p => {
+  const sector = p.name.split(' ')[0]
+  const issuer = p.name.split(' ')[0]
+  final_sector_weights[sector] = (final_sector_weights[sector] || 0) + p.weight
+  final_issuer_weights[issuer] = (final_issuer_weights[issuer] || 0) + p.weight
+})
+
+Object.values(final_sector_weights).forEach(w => {
+  if (w > max_sector_weight) sector_breach = true
+})
+
+Object.values(final_issuer_weights).forEach(w => {
+  if (w > max_issuer_weight) issuer_breach = true
+})
+
+risk_status = 'PASS'
+if (duration_breach || sector_breach || issuer_breach) {
+  risk_status = 'FAIL'
+}
+
+__result__ = 'Risk Check: ' + risk_status + ' | Duration: ' + portfolio_duration.toFixed(2) + ' | Yield: ' + portfolio_yield.toFixed(2) + '%'`, 'risk', 'Final Risk Validation'),
+        
+        createCell(12, `buy_list = final_portfolio.map(p => ({
+  id: 'trade-' + p.cusip,
+  security: p.name,
+  cusip: p.cusip,
+  action: 'buy',
+  quantity: 1000000 * (p.weight / 100),
+  price: 0,
+  reason: 'BUY_HIGH_SCORE',
+  score: p.score
+}))
+
+excluded_securities = ranked_securities.slice(current_portfolio.length).slice(0, 10)
+exclude_list = excluded_securities.map(s => ({
+  cusip: s.cusip,
+  name: s.name,
+  reason: 'Score too low or concentration breach',
+  score: s.composite_score
+}))
+
+__result__ = 'Generated ' + buy_list.length + ' buy orders | Excluded: ' + exclude_list.length + ' securities'`, 'trade', 'Generate Trade List'),
+        
+        createCell(13, `portfolio_summary = {
+  security_count: final_portfolio.length,
+  total_weight: final_portfolio.reduce((sum, p) => sum + p.weight, 0),
+  avg_yield: portfolio_yield,
+  avg_duration: portfolio_duration,
+  avg_rating: final_portfolio[0]?.rating || 'N/A',
+  iterations_used: iteration,
+  risk_compliant: risk_status === 'PASS'
+}
+
+sector_summary = Object.entries(final_sector_weights).map(([sector, weight]) => ({
+  sector,
+  weight: weight.toFixed(2) + '%',
+  breach: weight > max_sector_weight
+}))
+
+__result__ = JSON.stringify(portfolio_summary, null, 2) + '\\n\\nSector Exposures:\\n' + JSON.stringify(sector_summary, null, 2)`, 'general', 'Portfolio Summary Report')
+      ],
+      parameters: [
+        { id: 'p1', name: 'min_yield', value: 6.0, type: 'number', description: 'Minimum acceptable yield %' },
+        { id: 'p2', name: 'max_yield', value: 12.0, type: 'number', description: 'Maximum yield threshold %' },
+        { id: 'p3', name: 'min_spread', value: 300, type: 'number', description: 'Minimum credit spread (bps)' },
+        { id: 'p4', name: 'max_spread', value: 700, type: 'number', description: 'Maximum credit spread (bps)' },
+        { id: 'p5', name: 'target_duration', value: 4.5, type: 'number', description: 'Target portfolio duration' },
+        { id: 'p6', name: 'max_sector_weight', value: 25.0, type: 'number', description: 'Max sector concentration %' },
+        { id: 'p7', name: 'max_issuer_weight', value: 5.0, type: 'number', description: 'Max issuer concentration %' },
+        { id: 'p8', name: 'target_portfolio_size', value: 30, type: 'number', description: 'Target number of holdings' }
+      ]
+    }
   }
 ]
 
