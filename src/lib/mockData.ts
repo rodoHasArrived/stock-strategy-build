@@ -109,7 +109,8 @@ export const strategyTemplates: StrategyTemplate[] = [
       ],
       parameters: [
         { id: 'funding-cost', name: 'fundingCost', value: 2.0, type: 'number', description: 'Cost of financing (%)' }
-      ]
+      ],
+      transitions: {}
     }
   },
   {
@@ -152,7 +153,8 @@ export const strategyTemplates: StrategyTemplate[] = [
       parameters: [
         { id: 'short-duration', name: 'shortDuration', value: 3, type: 'number', description: 'Short leg duration threshold' },
         { id: 'long-duration', name: 'longDuration', value: 5, type: 'number', description: 'Long leg duration threshold' }
-      ]
+      ],
+      transitions: {}
     }
   },
   {
@@ -194,7 +196,8 @@ export const strategyTemplates: StrategyTemplate[] = [
       ],
       parameters: [
         { id: 'target-spread', name: 'targetSpread', value: 140, type: 'number', description: 'Minimum spread threshold (bps)' }
-      ]
+      ],
+      transitions: {}
     }
   }
 ]
