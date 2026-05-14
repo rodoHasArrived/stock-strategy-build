@@ -38,10 +38,27 @@ function App() {
 
   const handleCellCodeChange = (index: number, code: string) => {
     setStrategy((current) => {
-      const newCells = [...current!.cells]
+      if (!current || !Array.isArray(current.cells)) {
+        return {
+          id: 'default',
+          name: 'New Strategy',
+          description: '',
+          cells: [{
+            id: 'cell-0',
+            index: 0,
+            code,
+            output: '',
+            status: 'idle'
+          }],
+          parameters: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      }
+      const newCells = [...current.cells]
       newCells[index] = { ...newCells[index], code }
       return {
-        ...current!,
+        ...current,
         cells: newCells,
         updatedAt: Date.now()
       }
@@ -50,14 +67,31 @@ function App() {
 
   const handleDeleteCell = (index: number) => {
     setStrategy((current) => {
-      const newCells = current!.cells.filter((_, i) => i !== index)
+      if (!current || !Array.isArray(current.cells)) {
+        return {
+          id: 'default',
+          name: 'New Strategy',
+          description: '',
+          cells: [{
+            id: 'cell-0',
+            index: 0,
+            code: '',
+            output: '',
+            status: 'idle'
+          }],
+          parameters: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      }
+      const newCells = current.cells.filter((_, i) => i !== index)
       const reindexedCells = newCells.map((cell, i) => ({
         ...cell,
         id: `cell-${i}`,
         index: i
       }))
       return {
-        ...current!,
+        ...current,
         cells: reindexedCells.length > 0 ? reindexedCells : [{
           id: 'cell-0',
           index: 0,
@@ -72,7 +106,30 @@ function App() {
 
   const handleAddCell = () => {
     setStrategy((current) => {
-      const newIndex = current!.cells.length
+      if (!current || !Array.isArray(current.cells)) {
+        return {
+          id: 'default',
+          name: 'New Strategy',
+          description: '',
+          cells: [{
+            id: 'cell-0',
+            index: 0,
+            code: '',
+            output: '',
+            status: 'idle'
+          }, {
+            id: 'cell-1',
+            index: 1,
+            code: '',
+            output: '',
+            status: 'idle'
+          }],
+          parameters: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }
+      }
+      const newIndex = current.cells.length
       const newCell: CodeCell = {
         id: `cell-${newIndex}`,
         index: newIndex,
@@ -81,8 +138,8 @@ function App() {
         status: 'idle'
       }
       return {
-        ...current!,
-        cells: [...current!.cells, newCell],
+        ...current,
+        cells: [...current.cells, newCell],
         updatedAt: Date.now()
       }
     })

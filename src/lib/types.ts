@@ -4,6 +4,18 @@ export type ExecutionStatus = 'idle' | 'running' | 'success' | 'error' | 'skippe
 
 export type ControlFlowType = 'next' | 'goto' | 'if' | 'none'
 
+export interface Cell {
+  id: string
+  row: number
+  col: number
+  value: CellValue
+  displayValue: string
+  type: 'value' | 'formula' | 'error'
+  formula?: string
+  error?: string
+  isCalculating?: boolean
+}
+
 export interface CodeCell {
   id: string
   index: number
