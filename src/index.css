@@ -162,3 +162,57 @@
   background-size: 1000px 100%;
   animation: shimmer 2s infinite linear;
 }
+
+.strategy-flow-handle {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--color-background);
+  background: var(--color-accent);
+}
+
+.strategy-flow-node {
+  font-family: var(--font-sans), sans-serif;
+}
+
+.react-flow__edge-textbg {
+  fill: var(--color-card);
+  opacity: 0.92;
+}
+
+.react-flow__controls {
+  border: 1px solid var(--color-border);
+  box-shadow: 6px 6px 0 0 color-mix(in oklab, var(--color-foreground) 10%, transparent);
+}
+
+.react-flow__controls-button {
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-foreground);
+}
+
+.react-flow__minimap {
+  border-radius: 0.75rem;
+}
+
+.trade-grid.ag-theme-quartz {
+  --ag-background-color: var(--color-card);
+  --ag-foreground-color: var(--color-foreground);
+  --ag-border-color: color-mix(in oklab, var(--color-border) 70%, transparent);
+  --ag-header-background-color: color-mix(in oklab, var(--color-muted) 65%, white);
+  --ag-header-foreground-color: var(--color-foreground);
+  --ag-odd-row-background-color: color-mix(in oklab, var(--color-muted) 40%, transparent);
+  --ag-row-hover-color: color-mix(in oklab, var(--color-accent) 10%, white);
+  --ag-selected-row-background-color: color-mix(in oklab, var(--color-accent) 15%, white);
+  --ag-font-family: var(--font-sans), sans-serif;
+  --ag-border-radius: 0px;
+  --ag-wrapper-border-radius: 0px;
+  --ag-header-height: 44px;
+}
+
+.trade-grid .ag-root-wrapper {
+  border: 0;
+}
+
+.trade-grid .ag-paging-panel {
+  border-top: 1px solid color-mix(in oklab, var(--color-border) 70%, transparent);
+}

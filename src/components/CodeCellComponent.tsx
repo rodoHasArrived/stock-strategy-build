@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { lazy, Suspense, useCallback, useState } from 'react'
 import { CodeCell as CodeCellType, CellMode, Condition, CellComment, CellContract } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,9 @@ import { FormulaAutocomplete } from '@/components/FormulaAutocomplete'
 import { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
 import { CellContractEditor } from '@/components/CellContractEditor'
 import { CellContractDisplay } from '@/components/CellContractDisplay'
+import type { OnMount } from '@monaco-editor/react'
+
+const MonacoEditor = lazy(() => import('@monaco-editor/react'))
 
 interface CodeCellProps {
   cell: CodeCellType
@@ -49,19 +52,11 @@ export function CodeCellComponent({
   currentUser,
   dragHandleProps
 }: CodeCellProps) {
-  const [isEditing, setIsEditing] = useState(false)
   const [cellLabel, setCellLabel] = useState(cell.label || '')
   const [showContractEditor, setShowContractEditor] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   
   const cellComments = comments.filter(c => c.cellId === cell.id)
   const unresolvedComments = cellComments.filter(c => !c.parentId && !c.resolved).length
-
-  useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus()
-    }
-  }, [isEditing])
 
   const getStatusBadge = () => {
     switch (cell.status) {
@@ -128,6 +123,12 @@ export function CodeCellComponent({
   const handleContractChange = (contract: CellContract) => {
     onCellChange({ contract })
   }
+
+  const handleCodeEditorMount = useCallback<OnMount>((editor, monaco) => {
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+      onRun()
+    })
+  }, [onRun])
 
   return (
     <Card 
@@ -385,16 +386,34 @@ export function CodeCellComponent({
 
               <TabsContent value="code" className="mt-3">
                 <div className="space-y-2">
-                  <FormulaAutocomplete
-                    value={cell.code}
-                    onChange={onCodeChange}
-                    onRun={onRun}
-                    placeholder="Enter code... (use 'if condition: next', 'goto n', etc.)"
-                    className="min-h-[80px] bg-muted/30"
-                    id={`cell-code-${cell.index}`}
-                  />
+                  <div className="overflow-hidden rounded-md border border-border bg-[#111827]">
+                    <Suspense fallback={<div role="status" aria-live="polite" className="flex h-[320px] items-center justify-center text-sm text-muted-foreground">Loading code editor…</div>}>
+                      <MonacoEditor
+                        height="320px"
+                        defaultLanguage="python"
+                        path={`${cell.id}.py`}
+                        value={cell.code}
+                        onMount={handleCodeEditorMount}
+                        onChange={(value) => onCodeChange(value ?? '')}
+                        options={{
+                          automaticLayout: true,
+                          fontFamily: 'Space Mono, monospace',
+                          fontLigatures: true,
+                          fontSize: 13,
+                          lineNumbersMinChars: 3,
+                          minimap: { enabled: false },
+                          padding: { top: 12, bottom: 12 },
+                          quickSuggestions: true,
+                          scrollBeyondLastLine: false,
+                          smoothScrolling: true,
+                          wordWrap: 'on',
+                        }}
+                        theme="vs-dark"
+                      />
+                    </Suspense>
+                  </div>
                   <div className="text-xs text-muted-foreground">
-                    Press ↑↓ to navigate suggestions, Enter/Tab to accept, Cmd+Enter to run
+                    Code editor with syntax highlighting and IntelliSense. Press Cmd/Ctrl+Enter to run.
                   </div>
                 </div>
               </TabsContent>
