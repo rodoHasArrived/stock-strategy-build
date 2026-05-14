@@ -172,7 +172,7 @@ export interface StrategyTemplate {
 export interface TransitionRule {
   id: string
   condition?: string
-  action: 'next' | 'goto' | 'stop' | 'loop' | 'while' | 'pass' | 'fail' | 'missing_data' | 'error'
+  action: 'next' | 'goto' | 'stop' | 'loop' | 'while' | 'for_each' | 'retry' | 'pass' | 'fail' | 'missing_data' | 'error' | 'on_error'
   target?: number
   label?: string
   backwardJumpJustification?: string
@@ -181,6 +181,19 @@ export interface TransitionRule {
     endCell: number
     maxIterations: number
     exitCondition?: string
+    iteratorVariable?: string
+  }
+  forEachConfig?: {
+    collection: string
+    iteratorVariable: string
+    startCell: number
+    endCell: number
+    maxIterations?: number
+  }
+  retryConfig?: {
+    maxRetries: number
+    backoff: 'linear' | 'exponential'
+    condition?: string
   }
 }
 
