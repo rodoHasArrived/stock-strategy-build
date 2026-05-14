@@ -1,15 +1,27 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, S
-import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-}
-const defaultContract = (): CellContract => ({
-  outputs: [],
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Switch } from '@/components/ui/switch'
+import { Plus, Trash, Check, X } from '@phosphor-icons/react'
+import { CellContract, TypedField, ValidationRule, DataType, FailureBehavior } from '@/lib/types'
 
+interface CellContractEditorProps {
+  contract?: CellContract
+  onChange: (contract: CellContract) => void
+  onClose: () => void
+}
+
+const defaultContract = (): CellContract => ({
+  inputs: [],
+  outputs: [],
+  requiredContext: [],
+  requiredFields: [],
+  validation: [],
   failureBehavior: 'halt'
 })
 
@@ -133,132 +145,132 @@ export function CellContractEditor({ contract, onChange, onClose }: CellContract
                       <div className="flex items-center justify-between">
                         <Input
                           placeholder="Field name"
-            <TabsTrigger value="outputs">Outputs</TabsTrigger>
-            <TabsTrigger value="validation">Validation</TabsTrigger>{ name: e.target.value })}
-            <TabsTrigger value="behavior">Behavior</TabsTrigger>
-          </TabsList>   />
-                        <Button size="sm" variant="ghost" onClick={() => removeInput(index)}>
-          <TabsContent value="inputs" className="space-y-3 mt-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Input Fields</Label>
-              <Button size="sm" variant="outline" onClick={addInput}>
-                <Plus size={14} className="mr-1" />s-2 gap-2">
-                Add Inputdiv>
-              </Button>   <Label className="text-xs">Type</Label>
-                Ad        <Select
-                            value={input.type}
-            <ScrollArea className="h-64 pr-3">lue: DataType) => handleInputChange(index, { type: value })}
-              <div className="space-y-3">
-                {localContract.inputs.map((input, index) => (
-                  <Card key={index} className="p-3 bg-muted/30">
-                      <div className="flex item
-                      <div className="flex items-center justify-between">
-                        <Input{dataTypes.map((type) => (
-                          placeholder="Field name"ype} value={type}>
                           value={input.name}
                           onChange={(e) => handleInputChange(index, { name: e.target.value })}
                           className="flex-1 h-8 mr-2"
-                        />  </SelectContent>
+                        />
                         <Button size="sm" variant="ghost" onClick={() => removeInput(index)}>
                           <Trash size={14} />
                         </Button>
-                      </div> className="flex items-center gap-2 pt-5">
-                          <Switch
+                      </div>
+                      
                       <div className="grid grid-cols-2 gap-2">
-                            <nCheckedChange={(checked) => handleInputChange(index, { required: checked })}
+                        <div>
                           <Label className="text-xs">Type</Label>
-                          <SelectclassName="text-xs">Required</Label>
+                          <Select
                             value={input.type}
                             onValueChange={(value: DataType) => handleInputChange(index, { type: value })}
                           >
                             <SelectTrigger className="h-8">
-                              <SelectValue />ion (optional)"
-                            </SelectTrigger>tion || ''}
-                            <SelectContent>ndleInputChange(index, { description: e.target.value })}
-                              {dataTypes.map((type) => (
-                                <SelectItem key={type} value={type}>
-                                  {type}
-                                </SelectItem>
-                        placehold
-                            </SelectContent>
-                          </Select>ts.length === 0 && (
-                        </div>me="text-center py-8 text-muted-foreground text-sm">
-                        nputs defined. Click "Add Input" to start.
-                        <div className="flex items-center gap-2 pt-5">
-                          <Switch
-                            checked={input.required}
-                            onCheckedChange={(checked) => handleInputChange(index, { required: checked })}
-                          />
-                          <Label className="text-xs">Required</Label>
-                        </div>outputs" className="space-y-3 mt-4">
-                      </div>flex items-center justify-between">
-            <div classlassName="text-sm font-medium">Output Fields</Label>
-                <Plus size={sm" variant="outline" onClick={addOutput}>
-                        placeholder="Description (optional)"
-                        value={input.description || ''}
-                        onChange={(e) => handleInputChange(index, { description: e.target.value })}
-                        className="h-8 text-xs"
-                      />
-                    </div>assName="h-64 pr-3">
-                  </Card>ame="space-y-3">
-                   calContract.outputs.map((output, index) => (
-                {localContract.inputs.length === 0 && (uted/30">
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    No inputs defined. Click "Add Input" to start.tween">
-                  </div><Input
-                )}        placeholder="Field name"
-              </div>      value={output.name}
-            </ScrollArea> onChange={(e) => handleOutputChange(index, { name: e.target.value })}
-          </TabsContent>  className="flex-1 h-8 mr-2"
-                        />
-          <TabsContent value="outputs" className="space-y-3 mt-4">{() => removeOutput(index)}>
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Output Fields</Label>
-              <Button size="sm" variant="outline" onClick={addOutput}>
-                <Plus size={14} className="mr-1" />
-                Add Output className="grid grid-cols-2 gap-2">
-                        <div>
-            </div>        <Label className="text-xs">Type</Label>
-                          <Select
-            <ScrollArea className="h-64 pr-3">}
-                            onChange={(e)={(value: DataType) => handleOutputChange(index, { type: value })}
-                {localContract.outputs.map((output, index) => (
-                  <Card key={index} className="p-3 bg-muted/30">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <InputelectContent>
-                          placeholder="Field name") => (
-                          value={output.name}ey={type} value={type}>
-                          onChange={(e) => handleOutputChange(index, { name: e.target.value })}
-                          className="flex-1 h-8 mr-2"
-                      )}      ))}
-                        <Button size="sm" variant="ghost" onClick={() => removeOutput(index)}>
-                        placeholder="Error me
-                        </Button>
-                        clas
-                        <div className="flex items-center gap-2 pt-5">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>hecked={output.required}
-                          <Label className="text-xs">Type</Label>utputChange(index, { required: checked })}
-                          <Select
-                )}        <Label className="text-xs">Required</Label>
-                            onValueChange={(value: DataType) => handleOutputChange(index, { type: value })}
-          </TabsContent>div>
-                            <SelectTrigger className="h-8">
                               <SelectValue />
-                            </SelectTrigger>tion (optional)"
-                            <SelectContent>iption || ''}
-                              {dataTypes.map((type) => (nge(index, { description: e.target.value })}
+                            </SelectTrigger>
+                            <SelectContent>
+                              {dataTypes.map((type) => (
                                 <SelectItem key={type} value={type}>
                                   {type}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                        </div>.outputs.length === 0 && (
-                        lassName="text-center py-8 text-muted-foreground text-sm">
+                        </div>
+                        
                         <div className="flex items-center gap-2 pt-5">
                           <Switch
+                            checked={input.required}
+                            onCheckedChange={(checked) => handleInputChange(index, { required: checked })}
+                          />
+                          <Label className="text-xs">Required</Label>
+                        </div>
+                      </div>
+                      
+                      <Input
+                        placeholder="Description (optional)"
+                        value={input.description || ''}
+                        onChange={(e) => handleInputChange(index, { description: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </Card>
+                ))}
+                
+                {localContract.inputs.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No inputs defined. Click "Add Input" to start.
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="outputs" className="space-y-3 mt-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Output Fields</Label>
+              <Button size="sm" variant="outline" onClick={addOutput}>
+                <Plus size={14} className="mr-1" />
+                Add Output
+              </Button>
+            </div>
+            
+            <ScrollArea className="h-64 pr-3">
+              <div className="space-y-3">
+                {localContract.outputs.map((output, index) => (
+                  <Card key={index} className="p-3 bg-muted/30">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Input
+                          placeholder="Field name"
+                          value={output.name}
+                          onChange={(e) => handleOutputChange(index, { name: e.target.value })}
+                          className="flex-1 h-8 mr-2"
+                        />
+                        <Button size="sm" variant="ghost" onClick={() => removeOutput(index)}>
+                          <Trash size={14} />
+                        </Button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs">Type</Label>
+                          <Select
+                            value={output.type}
+                            onValueChange={(value: DataType) => handleOutputChange(index, { type: value })}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {dataTypes.map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {type}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 pt-5">
+                          <Switch
+                            checked={output.required}
+                            onCheckedChange={(checked) => handleOutputChange(index, { required: checked })}
+                          />
+                          <Label className="text-xs">Required</Label>
+                        </div>
+                      </div>
+                      
+                      <Input
+                        placeholder="Description (optional)"
+                        value={output.description || ''}
+                        onChange={(e) => handleOutputChange(index, { description: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </Card>
+                ))}
+                
+                {localContract.outputs.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No outputs defined. Click "Add Output" to start.
+                  </div>
                 )}
               </div>
             </ScrollArea>
@@ -328,140 +340,6 @@ export function CellContractEditor({ contract, onChange, onClose }: CellContract
                 value={localContract.failureBehavior}
                 onValueChange={(value: FailureBehavior) => 
                   setLocalContract({ ...localContract, failureBehavior: value })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                 }
               >
                 <SelectTrigger className="w-full">
