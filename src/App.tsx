@@ -309,7 +309,9 @@ function App() {
     toast.success('Strategy saved successfully')
   }
 
-  if (!strategy) return null
+  if (!strategy || !Array.isArray(strategy.cells)) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -379,7 +381,7 @@ function App() {
           <div className="lg:col-span-1 space-y-4">
             <ContextInspector context={executionContext} />
             <ParameterPanel
-              parameters={strategy.parameters}
+              parameters={Array.isArray(strategy.parameters) ? strategy.parameters : []}
               onParametersChange={handleParametersChange}
             />
           </div>
