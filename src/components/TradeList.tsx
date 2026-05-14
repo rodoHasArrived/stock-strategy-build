@@ -168,7 +168,7 @@ export function TradeList({ trades, onExport }: TradeListProps) {
               Trade Output
             </CardTitle>
             <CardDescription>
-              AG Grid now handles result virtualization and paging for larger trade sets.
+              Displays actionable trade recommendations with virtualized rendering and paging for larger trade sets.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">

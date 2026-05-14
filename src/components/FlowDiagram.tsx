@@ -221,7 +221,7 @@ export function FlowDiagram({ cells, onCellClick, highlightedCell }: FlowDiagram
         return null
       })()
 
-      if (edge && edge.to >= 0 && edge.to < cells.length) {
+      if (edge && edge.from >= 0 && edge.from < cells.length && edge.to >= 0 && edge.to < cells.length) {
         flowEdges.push(edge)
       }
     })

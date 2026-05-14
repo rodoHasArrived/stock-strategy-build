@@ -413,7 +413,7 @@ export function CodeCellComponent({
                     </Suspense>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Monaco is enabled only in code mode. Press Cmd/Ctrl+Enter to run this cell.
+                    Code editor with syntax highlighting and IntelliSense. Press Cmd/Ctrl+Enter to run.
                   </div>
                 </div>
               </TabsContent>
