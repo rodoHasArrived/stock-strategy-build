@@ -1,17 +1,14 @@
 import { useState } from 'react'
-import { CellContract, TypedField, ValidationRule, DataType, FailureBehavior } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
-import { Plus, Trash, Check, X, Warning } from '@phosphor-icons/react'
-import { cn } from '@/lib/utils'
+import { Switch } from '@/components/ui/switch'
+import { Plus, Trash, Check, X } from '@phosphor-icons/react'
+import { CellContract, TypedField, ValidationRule, DataType, FailureBehavior } from '@/lib/types'
 
 interface CellContractEditorProps {
   contract?: CellContract
@@ -25,9 +22,7 @@ const defaultContract = (): CellContract => ({
   requiredContext: [],
   requiredFields: [],
   validation: [],
-  failureBehavior: 'halt',
-  description: '',
-  tags: []
+  failureBehavior: 'halt'
 })
 
 const dataTypes: DataType[] = ['string', 'number', 'boolean', 'array', 'object', 'dataframe', 'series', 'any']
@@ -72,7 +67,7 @@ export function CellContractEditor({ contract, onChange, onClose }: CellContract
   const addValidation = () => {
     setLocalContract({
       ...localContract,
-      validation: [...localContract.validation, { id: `val-${Date.now()}`, type: 'required' }]
+      validation: [...localContract.validation, { id: `rule-${Date.now()}`, type: 'required', message: '' }]
     })
   }
 
@@ -104,7 +99,7 @@ export function CellContractEditor({ contract, onChange, onClose }: CellContract
 
   return (
     <Card className="border-2 border-accent/50">
-      <CardHeader className="pb-3">
+      <CardHeader>
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-lg">Cell Contract</CardTitle>
@@ -197,6 +192,7 @@ export function CellContractEditor({ contract, onChange, onClose }: CellContract
                     </div>
                   </Card>
                 ))}
+                
                 {localContract.inputs.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground text-sm">
                     No inputs defined. Click "Add Input" to start.
@@ -270,6 +266,7 @@ export function CellContractEditor({ contract, onChange, onClose }: CellContract
                     </div>
                   </Card>
                 ))}
+                
                 {localContract.outputs.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground text-sm">
                     No outputs defined. Click "Add Output" to start.
@@ -291,14 +288,14 @@ export function CellContractEditor({ contract, onChange, onClose }: CellContract
             <ScrollArea className="h-64 pr-3">
               <div className="space-y-3">
                 {localContract.validation.map((rule, index) => (
-                  <Card key={rule.id} className="p-3 bg-muted/30">
+                  <Card key={index} className="p-3 bg-muted/30">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Select
                           value={rule.type}
                           onValueChange={(value) => handleValidationChange(index, { type: value as any })}
                         >
-                          <SelectTrigger className="h-8 flex-1 mr-2">
+                          <SelectTrigger className="flex-1 h-8 mr-2">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -314,142 +311,66 @@ export function CellContractEditor({ contract, onChange, onClose }: CellContract
                         </Button>
                       </div>
                       
-                      {(rule.type === 'range') && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <Input
-                            placeholder="Min value"
-                            value={rule.value || ''}
-                            onChange={(e) => handleValidationChange(index, { value: e.target.value })}
-                            className="h-8"
-                          />
-                          <Input
-                            placeholder="Max value"
-                            value={rule.value2 || ''}
-                            onChange={(e) => handleValidationChange(index, { value2: e.target.value })}
-                            className="h-8"
-                          />
-                        </div>
-                      )}
-                      
-                      {(rule.type === 'pattern' || rule.type === 'custom') && (
-                        <Input
-                          placeholder={rule.type === 'pattern' ? 'Pattern (regex)' : 'Custom function'}
-                          value={rule.type === 'pattern' ? rule.value : rule.customFn || ''}
-                          onChange={(e) => handleValidationChange(index, 
-                            rule.type === 'pattern' ? { value: e.target.value } : { customFn: e.target.value }
-                          )}
-                          className="h-8"
-                        />
-                      )}
-                      
                       <Input
                         placeholder="Error message"
-                        value={rule.message || ''}
+                        value={rule.message}
                         onChange={(e) => handleValidationChange(index, { message: e.target.value })}
                         className="h-8 text-xs"
                       />
                     </div>
                   </Card>
                 ))}
+                
                 {localContract.validation.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground text-sm">
-                    No validation rules. Click "Add Rule" to start.
+                    No validation rules defined. Click "Add Rule" to start.
                   </div>
                 )}
               </div>
             </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="behavior" className="space-y-4 mt-4">
-            <div className="space-y-3">
-              <div>
-                <Label className="text-sm">Failure Behavior</Label>
-                <Select
-                  value={localContract.failureBehavior}
-                  onValueChange={(value: FailureBehavior) => 
-                    setLocalContract({ ...localContract, failureBehavior: value })
-                  }
-                >
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {failureBehaviors.map((behavior) => (
-                      <SelectItem key={behavior} value={behavior}>
-                        {behavior}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {localContract.failureBehavior === 'halt' && 'Stop execution on failure'}
-                  {localContract.failureBehavior === 'skip' && 'Skip this cell and continue'}
-                  {localContract.failureBehavior === 'retry' && 'Retry execution with backoff'}
-                  {localContract.failureBehavior === 'default' && 'Use default value on failure'}
-                  {localContract.failureBehavior === 'warn' && 'Log warning and continue'}
-                </p>
-              </div>
+          <TabsContent value="behavior" className="space-y-3 mt-4">
+            <div>
+              <Label className="text-sm font-medium">Failure Behavior</Label>
+              <p className="text-xs text-muted-foreground mb-3">
+                How should the cell handle validation failures?
+              </p>
+              <Select
+                value={localContract.failureBehavior}
+                onValueChange={(value: FailureBehavior) => 
+                  setLocalContract({ ...localContract, failureBehavior: value })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {failureBehaviors.map((behavior) => (
+                    <SelectItem key={behavior} value={behavior}>
+                      {behavior}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <Separator />
-
-              <div>
-                <Label className="text-sm">Required Context Variables</Label>
-                <Input
-                  placeholder="Comma-separated list (e.g., portfolio, universe)"
-                  value={localContract.requiredContext.join(', ')}
-                  onChange={(e) =>
-                    setLocalContract({
-                      ...localContract,
-                      requiredContext: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-                    })
-                  }
-                  className="mt-1.5"
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm">Required Data Fields</Label>
-                <Input
-                  placeholder="Comma-separated list (e.g., price, volume, yield)"
-                  value={localContract.requiredFields.join(', ')}
-                  onChange={(e) =>
-                    setLocalContract({
-                      ...localContract,
-                      requiredFields: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-                    })
-                  }
-                  className="mt-1.5"
-                />
-              </div>
-
-              <Separator />
-
-              <div>
-                <Label className="text-sm">Description</Label>
-                <Input
-                  placeholder="What does this cell do?"
-                  value={localContract.description || ''}
-                  onChange={(e) =>
-                    setLocalContract({ ...localContract, description: e.target.value })
-                  }
-                  className="mt-1.5"
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm">Tags</Label>
-                <Input
-                  placeholder="Comma-separated tags (e.g., risk, calculation)"
-                  value={(localContract.tags || []).join(', ')}
-                  onChange={(e) =>
-                    setLocalContract({
-                      ...localContract,
-                      tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-                    })
-                  }
-                  className="mt-1.5"
-                />
-              </div>
+            <div>
+              <Label className="text-sm font-medium">Required Context Variables</Label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Variables that must exist in context before execution
+              </p>
+              <Input
+                placeholder="Comma-separated variable names"
+                value={localContract.requiredContext?.join(', ') || ''}
+                onChange={(e) => 
+                  setLocalContract({ 
+                    ...localContract, 
+                    requiredContext: e.target.value.split(',').map(v => v.trim()).filter(Boolean)
+                  })
+                }
+                className="h-9"
+              />
             </div>
           </TabsContent>
         </Tabs>

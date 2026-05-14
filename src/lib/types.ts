@@ -182,6 +182,7 @@ export interface TransitionRule {
     maxIterations: number
     exitCondition?: string
   }
+  backwardJumpJustification?: string
 }
 
 export interface RunTraceEntry {
@@ -356,4 +357,29 @@ export interface StrategySignal {
   symbol?: string
   reason?: string
   [key: string]: any
+}
+
+export interface ExecutionStep {
+  cellIndex: number
+  cellLabel?: string
+  code: string
+  inputCount?: number
+  outputCount?: number
+  result: any
+  error?: string
+  executionTime: number
+  timestamp: number
+  reason?: string
+}
+
+export interface ExecutionTrace {
+  strategyId: string
+  strategyName: string
+  timestamp: number
+  steps: ExecutionStep[]
+  totalExecutionTime: number
+  success: boolean
+  finalVariables: Record<string, any>
+  branchPath: number[]
+  loopIterations: Record<number, number>
 }

@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
@@ -115,7 +116,23 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
       if (!hasMaxIterations) {
         warnings.push('Loop detected without max iteration limit')
       }
+      
+      const hasExitCondition = rules.some(r => 
+        r.loopConfig?.exitCondition && r.loopConfig.exitCondition.trim().length > 0
+      )
+      if (!hasExitCondition) {
+        warnings.push('Loop detected without exit condition - infinite loop risk')
+      }
     }
+
+    const backwardJumps = rules.filter(r => 
+      r.action === 'goto' && r.target != null && r.target <= fromCell
+    )
+    backwardJumps.forEach((rule) => {
+      if (!rule.backwardJumpJustification || rule.backwardJumpJustification.trim().length === 0) {
+        warnings.push(`Backward jump to cell ${rule.target} requires justification`)
+      }
+    })
 
     const branchPaths = executionPaths.filter(p => p.type === 'branch' || p.type === 'conditional')
     if (branchPaths.length > 3) {
@@ -130,7 +147,7 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
     }
 
     return warnings
-  }, [executionPaths, rules, cellCount])
+  }, [executionPaths, rules, cellCount, fromCell])
 
   // Backward-jump rules that are missing a justification — these are blocking errors
   const backwardJumpErrors = useMemo(() => {
