@@ -407,7 +407,7 @@ export function CodeCellComponent({
               </div>
             )}
 
-            {cell.sampleOutput && cell.status === 'success' && cell.sampleOutput !== cell.output && (
+            {cell.sampleOutput && cell.status === 'success' && cell.sampleOutput.startsWith('[') && (
               <div className="border-l-4 border-accent/50 pl-3 py-2">
                 <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                   <Table size={12} />

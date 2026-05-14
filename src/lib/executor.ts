@@ -46,6 +46,7 @@ export class StrategyExecutor {
   private parameters: Parameter[]
   private securities: Security[]
   private runTrace: RunTraceEntry[] = []
+  private prevRowCounts: Map<number, number> = new Map()
 
   constructor(cells: CodeCell[], parameters: Parameter[], securities: Security[] = mockSecurities) {
     this.cells = cells
@@ -165,16 +166,16 @@ export class StrategyExecutor {
 
       if (result != null) {
         if (Array.isArray(result)) {
-          const prevLen = (cell as any)._prevRowCount ?? 0
+          const prevLen = this.prevRowCounts.get(cellIndex) ?? 0
           rowCountDelta = result.length - prevLen
+          this.prevRowCounts.set(cellIndex, result.length)
           sampleOutput = JSON.stringify(result.slice(0, 3), null, 2)
         } else if (typeof result === 'object' && result !== null && 'data' in result && Array.isArray((result as any).data)) {
           const df = result as any
-          const prevLen = (cell as any)._prevRowCount ?? 0
+          const prevLen = this.prevRowCounts.get(cellIndex) ?? 0
           rowCountDelta = df.data.length - prevLen
+          this.prevRowCounts.set(cellIndex, df.data.length)
           sampleOutput = JSON.stringify(df.data.slice(0, 3), null, 2)
-        } else {
-          sampleOutput = String(result).slice(0, 500)
         }
       }
 

@@ -374,7 +374,7 @@ __result__ = custom_yield`
                     </div>
                   ))}
                   <p className="text-[10px] text-muted-foreground pt-1">
-                    Left = expected · Right = calculated. Tolerance ±0.5%.
+                    Left = expected · Right = calculated. Tolerance is fixture-specific (0.01% for par, 0.5% for discount/premium).
                   </p>
                 </div>
               ) : (

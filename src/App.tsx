@@ -185,7 +185,6 @@ function App() {
       // Insert duplicate immediately after the source cell
       const duplicate: CodeCell = {
         ...source,
-        id: `cell-${Date.now()}`,
         status: 'idle',
         output: '',
         error: undefined,
