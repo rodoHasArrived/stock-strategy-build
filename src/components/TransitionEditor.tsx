@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
@@ -99,7 +100,23 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
       if (!hasMaxIterations) {
         warnings.push('Loop detected without max iteration limit')
       }
+      
+      const hasExitCondition = rules.some(r => 
+        r.loopConfig?.exitCondition && r.loopConfig.exitCondition.trim().length > 0
+      )
+      if (!hasExitCondition) {
+        warnings.push('Loop detected without exit condition - infinite loop risk')
+      }
     }
+
+    const backwardJumps = rules.filter(r => 
+      r.action === 'goto' && r.target != null && r.target <= fromCell
+    )
+    backwardJumps.forEach((rule) => {
+      if (!rule.backwardJumpJustification || rule.backwardJumpJustification.trim().length === 0) {
+        warnings.push(`Backward jump to cell ${rule.target} requires justification`)
+      }
+    })
 
     const branchPaths = executionPaths.filter(p => p.type === 'branch' || p.type === 'conditional')
     if (branchPaths.length > 3) {
@@ -114,7 +131,7 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
     }
 
     return warnings
-  }, [executionPaths, rules, cellCount])
+  }, [executionPaths, rules, cellCount, fromCell])
 
   const generateCode = () => {
     return rules.map(rule => {
@@ -339,6 +356,31 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
                         </div>
                       )}
                     </div>
+
+                    {rule.action === 'goto' && rule.target != null && rule.target <= fromCell && (
+                      <div className="space-y-2 pt-2 border-t border-warning/20 bg-warning/5 p-3 rounded-md">
+                        <div className="flex items-start gap-2 mb-2">
+                          <Warning size={16} className="text-warning mt-0.5 flex-shrink-0" weight="bold" />
+                          <div>
+                            <Label className="text-xs font-semibold text-warning-foreground">
+                              Backward Jump Justification Required
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Loops that jump backward must include a clear explanation to prevent infinite loops
+                            </p>
+                          </div>
+                        </div>
+                        <Textarea
+                          placeholder="e.g., Iterating until portfolio risk < threshold, max 50 iterations"
+                          value={rule.backwardJumpJustification || ''}
+                          onChange={(e) => 
+                            updateRule(rule.id, { backwardJumpJustification: e.target.value })
+                          }
+                          className="text-xs min-h-[60px] resize-none"
+                          id={`backward-justification-${rule.id}`}
+                        />
+                      </div>
+                    )}
 
                     {rule.action === 'loop' && (
                       <div className="space-y-2 pt-2 border-t">
