@@ -557,6 +557,8 @@ function App() {
       description: template.description,
       cells: template.strategy.cells,
       parameters: template.strategy.parameters,
+      transitions: template.strategy.transitions || {},
+      governance: template.strategy.governance || createDefaultGovernance(),
       createdAt: Date.now(),
       updatedAt: Date.now()
     }
@@ -871,13 +873,21 @@ function App() {
                   </div>
 
                   {/* Cells / Backtest content */}
-                  <div className="flex-1 min-h-0 overflow-hidden">
-                    {activeTab === 'backtest' ? (
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
+                    <div className="hidden">
+                      <TabsList>
+                        <TabsTrigger value="cells">Cells</TabsTrigger>
+                        <TabsTrigger value="backtest">Backtest</TabsTrigger>
+                      </TabsList>
+                    </div>
+
+                    <TabsContent value="backtest" className="flex-1 min-h-0 mt-0">
                       <ScrollArea className="h-full">
                         <BacktestBuilder onRun={handleBacktestRun} />
                       </ScrollArea>
-                    ) : (
-                      /* Cells view with optional split pane */
+                    </TabsContent>
+
+                    <TabsContent value="cells" className="flex-1 min-h-0 mt-0">
                       <div className={cn("h-full", viewMode === 'split' ? "flex gap-4" : "")}>
                         {/* Notebook pane */}
                         {(viewMode === 'notebook' || viewMode === 'split') && (
@@ -972,8 +982,8 @@ function App() {
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </TabsContent>
+                  </Tabs>
                 </div>
 
                 {/* Right panel with tabbed sections */}

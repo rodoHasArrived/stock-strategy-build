@@ -62,7 +62,8 @@ __result__ = 'Selected top ' + selected.length + ' securities'`, 'portfolio', 'S
         { id: 'p2', name: 'max_duration', value: 6.0, type: 'number', description: 'Maximum duration years' },
         { id: 'p3', name: 'max_position_weight', value: 2.0, type: 'number', description: 'Max position weight %' },
         { id: 'p4', name: 'target_security_count', value: 50, type: 'number', description: 'Number of securities to hold' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -95,7 +96,8 @@ __result__ = 'Selected ' + final_selection.length + ' highest-yielding bonds'`, 
         { id: 'p1', name: 'min_yield', value: 4.5, type: 'number', description: 'Minimum yield %' },
         { id: 'p2', name: 'min_liquidity_score', value: 60, type: 'number', description: 'Minimum liquidity score' },
         { id: 'p3', name: 'max_issuer_exposure', value: 5.0, type: 'number', description: 'Max issuer exposure %' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -127,7 +129,8 @@ __result__ = 'Selected ' + selected.length + ' securities'`, 'portfolio', 'Selec
         { id: 'p1', name: 'target_duration', value: 5.0, type: 'number', description: 'Target portfolio duration' },
         { id: 'p2', name: 'duration_tolerance', value: 0.5, type: 'number', description: 'Duration tolerance +/-' },
         { id: 'p3', name: 'min_yield', value: 4.0, type: 'number', description: 'Minimum yield %' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -158,7 +161,8 @@ __result__ = 'Selected ' + selected.length + ' widest spreads'`, 'portfolio', 'S
       parameters: [
         { id: 'p1', name: 'min_spread', value: 150, type: 'number', description: 'Minimum spread (bps)' },
         { id: 'p2', name: 'max_spread', value: 400, type: 'number', description: 'Maximum spread (bps)' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -184,7 +188,8 @@ __result__ = 'Selected ' + portfolio.length + ' callable bonds'`, 'portfolio', '
       ],
       parameters: [
         { id: 'p1', name: 'min_ytw', value: 5.0, type: 'number', description: 'Minimum yield-to-worst %' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -210,7 +215,8 @@ __result__ = at_risk.length + ' securities at rating floor'`, 'condition', 'Iden
       ],
       parameters: [
         { id: 'p1', name: 'rating_floor', value: 'BBB-', type: 'text', description: 'Minimum acceptable rating' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -241,7 +247,8 @@ __result__ = 'Selected ' + selected.length + ' most liquid, high-yield bonds'`, 
       ],
       parameters: [
         { id: 'p1', name: 'min_liquidity_score', value: 70, type: 'number', description: 'Minimum liquidity score' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -268,7 +275,8 @@ __result__ = 'Selected ' + selected.length + ' yield-accretive securities'`, 'po
       parameters: [
         { id: 'p1', name: 'current_book_yield', value: 4.5, type: 'number', description: 'Current book yield %' },
         { id: 'p2', name: 'min_incremental_yield', value: 4.6, type: 'number', description: 'Minimum new security yield %' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -295,7 +303,8 @@ __result__ = 'Selected ' + selected.length + ' dividend growers'`, 'portfolio', 
       ],
       parameters: [
         { id: 'p1', name: 'min_dividend_yield', value: 2.5, type: 'number', description: 'Minimum dividend yield %' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -325,7 +334,8 @@ __result__ = 'Scored ' + scored.length + ' quality value stocks'`, 'ranking', 'S
   .slice(0, 25)
 __result__ = 'Selected ' + selected.length + ' quality value stocks'`, 'portfolio', 'Build Portfolio')
       ],
-      parameters: []
+      parameters: [],
+      transitions: {}
     }
   },
   
@@ -350,7 +360,8 @@ __result__ = momentum_stocks.length + ' stocks with positive momentum'`, 'condit
   .slice(0, 30)
 __result__ = 'Selected top ' + selected.length + ' momentum stocks'`, 'portfolio', 'Select Top Momentum')
       ],
-      parameters: []
+      parameters: [],
+      transitions: {}
     }
   },
   
@@ -372,7 +383,8 @@ __result__ = low_vol_stocks.length + ' low volatility stocks'`, 'condition', 'Lo
         createCell(2, `selected = low_vol_stocks.slice(0, 40)
 __result__ = 'Selected ' + selected.length + ' low volatility stocks'`, 'portfolio', 'Build Portfolio')
       ],
-      parameters: []
+      parameters: [],
+      transitions: {}
     }
   },
   
@@ -398,7 +410,8 @@ __result__ = positions_to_rebalance.length + ' positions need rebalancing'`, 'po
 }))
 __result__ = 'Generated ' + trades.length + ' rebalance trades'`, 'trade', 'Generate Trades')
       ],
-      parameters: []
+      parameters: [],
+      transitions: {}
     }
   },
   
@@ -430,7 +443,8 @@ trades = opportunities.map(s => ({
 }))
 __result__ = 'Allocated $' + allocation_per_security.toLocaleString() + ' per security'`, 'trade', 'Allocate Cash')
       ],
-      parameters: []
+      parameters: [],
+      transitions: {}
     }
   },
   
@@ -456,7 +470,8 @@ __result__ = sell_candidates.length + ' potential sells identified'`, 'condition
 }))
 __result__ = 'Generated ' + tax_efficient_sells.length + ' tax-efficient sells'`, 'trade', 'Generate Sells')
       ],
-      parameters: []
+      parameters: [],
+      transitions: {}
     }
   },
   
@@ -489,7 +504,8 @@ __result__ = overweight_issuers.length + ' overweight issuers found'`, 'risk', '
 }))
 __result__ = 'Generated ' + reduction_trades.length + ' reduction trades'`, 'trade', 'Generate Reductions')
       ],
-      parameters: []
+      parameters: [],
+      transitions: {}
     }
   },
   
@@ -523,7 +539,8 @@ __result__ = 'Portfolio duration: ' + portfolio_duration.toFixed(2) + (duration_
   __result__ = 'No duration repairs needed'
 }`, 'trade', 'Repair Duration')
       ],
-      parameters: []
+      parameters: [],
+      transitions: {}
     }
   },
   
@@ -612,7 +629,8 @@ if (target_position !== current_holding) {
         { id: 'p1', name: 'lookback_period', value: 60, type: 'number', description: 'Rolling window for mean/std' },
         { id: 'p2', name: 'z_enter_threshold', value: 0.25, type: 'number', description: 'Z-score to enter position' },
         { id: 'p3', name: 'z_exit_threshold', value: 0.75, type: 'number', description: 'Z-score to exit position' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -693,7 +711,8 @@ __result__ = 'Found ' + ranked_breakouts.length + ' breakout candidates'`, 'rank
         { id: 'p1', name: 'ma_period', value: 20, type: 'number', description: 'Moving average period' },
         { id: 'p2', name: 'breakout_threshold', value: 1.02, type: 'number', description: 'Price above MA threshold' },
         { id: 'p3', name: 'min_volume_ratio', value: 1.5, type: 'number', description: 'Volume surge multiplier' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -772,7 +791,8 @@ __result__ = trade_signal ? 'Signal: ' + trade_signal.action + ' | Reason: ' + t
         { id: 'p2', name: 'entry_z', value: 2.0, type: 'number', description: 'Z-score entry threshold' },
         { id: 'p3', name: 'exit_z', value: 0.5, type: 'number', description: 'Z-score exit threshold' },
         { id: 'p4', name: 'hedge_ratio', value: 1.0, type: 'number', description: 'Hedge ratio for pair' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -863,7 +883,8 @@ __result__ = needs_rebalance
       parameters: [
         { id: 'p1', name: 'drift_threshold', value: 0.05, type: 'number', description: 'Max allocation drift (decimal)' },
         { id: 'p2', name: 'rebalance_frequency_days', value: 90, type: 'number', description: 'Rebalance check frequency' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -939,7 +960,8 @@ __result__ = 'Current: ' + (current_holding || 'Cash') + ' → Target: ' + targe
         { id: 'p1', name: 'lookback_period', value: 60, type: 'number', description: 'Rolling window for spread statistics' },
         { id: 'p2', name: 'z_enter_threshold', value: 0.25, type: 'number', description: 'Z-score to switch positions' },
         { id: 'p3', name: 'z_return_threshold', value: 0.75, type: 'number', description: 'Z-score to return to base' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -1004,7 +1026,8 @@ __result__ = 'Generated ' + trades.length + ' rotation trades'`, 'trade', 'Gener
         { id: 'p1', name: 'lookback_period', value: 90, type: 'number', description: 'Momentum calculation window' },
         { id: 'p2', name: 'momentum_threshold', value: 5.0, type: 'number', description: 'Minimum momentum %' },
         { id: 'p3', name: 'max_sectors', value: 3, type: 'number', description: 'Max sectors to hold' }
-      ]
+      ],
+      transitions: {}
     }
   },
   
@@ -1089,7 +1112,8 @@ __result__ = 'Generated ' + rebalance_trades.length + ' rebalancing trades'`, 't
         { id: 'p1', name: 'volatility_window', value: 60, type: 'number', description: 'Volatility lookback days' },
         { id: 'p2', name: 'target_risk_contribution', value: 0.25, type: 'number', description: 'Equal risk per asset' },
         { id: 'p3', name: 'rebalance_threshold', value: 0.10, type: 'number', description: 'Weight drift to rebalance' }
-      ]
+      ],
+      transitions: {}
     }
   },
 
@@ -1344,7 +1368,8 @@ __result__ = JSON.stringify(portfolio_summary, null, 2) + '\\n\\nSector Exposure
         { id: 'p6', name: 'max_sector_weight', value: 25.0, type: 'number', description: 'Max sector concentration %' },
         { id: 'p7', name: 'max_issuer_weight', value: 5.0, type: 'number', description: 'Max issuer concentration %' },
         { id: 'p8', name: 'target_portfolio_size', value: 30, type: 'number', description: 'Target number of holdings' }
-      ]
+      ],
+      transitions: {}
     }
   }
 ]
