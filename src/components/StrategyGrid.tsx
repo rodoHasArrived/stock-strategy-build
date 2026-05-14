@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type ReactNode } from 'react'
 import { Cell, Parameter, Security } from '@/lib/types'
 import { GridCell } from './GridCell'
 import { columnToLetter, getCellId, evaluateFormula, formatCellValue, detectCircularReference } from '@/lib/formula'
@@ -99,7 +99,7 @@ export function StrategyGrid({
   }, [cells, parameters, securities, onCellsChange, paramMap])
 
   const renderGrid = () => {
-    const grid = []
+    const grid: ReactNode[] = []
 
     grid.push(
       <div key="header" className="flex sticky top-0 bg-secondary z-10">
@@ -116,7 +116,7 @@ export function StrategyGrid({
     )
 
     for (let row = 0; row < rows; row++) {
-      const rowCells = []
+      const rowCells: ReactNode[] = []
       
       rowCells.push(
         <div

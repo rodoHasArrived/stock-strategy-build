@@ -1,6 +1,8 @@
 import { CodeCell, ExecutionContext, Parameter, RunTraceEntry, Security } from './types'
 import { mockSecurities } from './mockData'
 import { ErrorAnalyzer, formatSmartError } from './errorAnalyzer'
+import { Basket, createBasketFactory, isBasket } from './basket'
+import { compileScriptingCode, ScriptDiagnostic } from './scriptingCompiler'
 
 export interface LoopGuardViolation {
   cellIndex: number
@@ -47,6 +49,7 @@ export class StrategyExecutor {
   private securities: Security[]
   private runTrace: RunTraceEntry[] = []
   private prevRowCounts: Map<number, number> = new Map()
+  private readonly createBasket: (options: ConstructorParameters<typeof Basket>[0]) => Basket
 
   constructor(cells: CodeCell[], parameters: Parameter[], securities: Security[] = mockSecurities) {
     this.cells = cells
@@ -58,6 +61,7 @@ export class StrategyExecutor {
       maxIterations: 1000,
       iterationCount: 0
     }
+    this.createBasket = createBasketFactory(securities)
     
     this.initializeParameters()
     this.initializeMarketDataFunctions()
@@ -74,60 +78,132 @@ export class StrategyExecutor {
   }
 
   private initializeMarketDataFunctions() {
-    this.context.variables['PRICE'] = (cusip: string) => {
-      const security = this.securities.find(s => s.cusip === cusip)
+    const getSecurity = (cusip: string) => this.securities.find(s => s.cusip.toUpperCase() === cusip.toUpperCase())
+    const getBasketMetric = (basket: Basket, metricName: string) => basket.metric(metricName)
+
+    this.context.variables['PRICE'] = (target: string | Basket) => {
+      if (isBasket(target)) return getBasketMetric(target, 'PRICE')
+      const security = getSecurity(target)
       return security?.price ?? null
     }
 
-    this.context.variables['YIELD'] = (cusip: string) => {
-      const security = this.securities.find(s => s.cusip === cusip)
+    this.context.variables['YIELD'] = (target: string | Basket) => {
+      if (isBasket(target)) return getBasketMetric(target, 'YIELD')
+      const security = getSecurity(target)
       return security?.yield ?? null
     }
 
-    this.context.variables['COUPON'] = (cusip: string) => {
-      const security = this.securities.find(s => s.cusip === cusip)
+    this.context.variables['COUPON'] = (target: string | Basket) => {
+      if (isBasket(target)) return getBasketMetric(target, 'COUPON')
+      const security = getSecurity(target)
       return security?.coupon ?? null
     }
 
-    this.context.variables['DURATION'] = (cusip: string) => {
-      const security = this.securities.find(s => s.cusip === cusip)
+    this.context.variables['DURATION'] = (target: string | Basket) => {
+      if (isBasket(target)) return getBasketMetric(target, 'DURATION')
+      const security = getSecurity(target)
       return security?.duration ?? null
     }
 
-    this.context.variables['SPREAD'] = (cusip: string) => {
-      const security = this.securities.find(s => s.cusip === cusip)
+    this.context.variables['SPREAD'] = (target: string | Basket) => {
+      if (isBasket(target)) return getBasketMetric(target, 'SPREAD')
+      const security = getSecurity(target)
       return security?.spread ?? null
     }
 
-    this.context.variables['RATING'] = (cusip: string) => {
-      const security = this.securities.find(s => s.cusip === cusip)
+    this.context.variables['RATING'] = (target: string | Basket) => {
+      if (isBasket(target)) return getBasketMetric(target, 'RATING')
+      const security = getSecurity(target)
       return security?.rating ?? null
     }
 
     this.context.variables['securities'] = this.securities
   }
 
-  private createSafeFunction(code: string): Function {
+  private createSafeFunction(code: string, capturedVariables: string[]): Function {
     const varDeclarations = Object.keys(this.context.variables)
       .map(key => `let ${key} = __context__.${key}`)
       .join(';\n')
+    const snapshotNames = Array.from(new Set([...Object.keys(this.context.variables), ...capturedVariables]))
 
     const fullCode = `
       ${varDeclarations};
       
       let __result__ = null;
       let __controlFlow__ = { type: 'none' };
+      const __snapshotNames__ = ${JSON.stringify(snapshotNames)};
+      const __setVar__ = (name, value) => {
+        __context__[name] = value;
+        return value;
+      };
+      const __completeFlow__ = (flow, resultValue) => {
+        __controlFlow__ = flow;
+        if (resultValue !== undefined) {
+          __result__ = resultValue;
+        }
+        throw { __strategyFlow__: true };
+      };
+      const __snapshotVariables__ = () => {
+        const variables = {};
+        for (const name of __snapshotNames__) {
+          try {
+            variables[name] = eval(name);
+          } catch {
+            if (name in __context__) {
+              variables[name] = __context__[name];
+            }
+          }
+        }
+        return variables;
+      };
+      const __createBasket__ = (options) => __createBasketFactory__(options);
+      function result(value) {
+        __result__ = value;
+        __setVar__('__lastResult__', value);
+        return value;
+      }
+      function next() {
+        __completeFlow__({ type: 'next' });
+      }
+      function goto(target) {
+        __completeFlow__({ type: 'goto', target: Number(target) });
+      }
+      function stop(reason) {
+        __completeFlow__({ type: 'stop', condition: reason });
+      }
+      function pass(reason) {
+        __completeFlow__({ type: 'pass', condition: reason });
+      }
+      function fail(reason) {
+        __completeFlow__({ type: 'fail', condition: reason });
+      }
+      function missingData(reason) {
+        __completeFlow__({ type: 'missing_data', condition: reason });
+      }
       
-      ${code}
+      try {
+        ${code}
+      } catch (error) {
+        if (!error || error.__strategyFlow__ !== true) {
+          throw error;
+        }
+      }
       
       return {
         result: __result__,
         controlFlow: __controlFlow__,
-        variables: {${Object.keys(this.context.variables).join(',')}}
+        variables: __snapshotVariables__()
       };
     `
 
-    return new Function('__context__', fullCode)
+    return new Function('__context__', '__createBasketFactory__', fullCode)
+  }
+
+  private formatDiagnostics(diagnostics: ScriptDiagnostic[]): string | undefined {
+    if (diagnostics.length === 0) return undefined
+    return diagnostics
+      .map((diagnostic) => `${diagnostic.level.toUpperCase()} line ${diagnostic.line}: ${diagnostic.message}`)
+      .join('\n')
   }
 
   public async executeCell(cellIndex: number): Promise<CodeCell> {
@@ -145,9 +221,17 @@ export class StrategyExecutor {
     const startTime = performance.now()
 
     try {
-      const parsedCode = this.parseControlFlow(cell.code)
-      const fn = this.createSafeFunction(parsedCode.code)
-      const execution = fn(this.context.variables)
+      const compiledCode = compileScriptingCode(cell.code, {
+        availableCusips: this.securities.map((security) => security.cusip)
+      })
+
+      const blockingDiagnostic = compiledCode.diagnostics.find((diagnostic) => diagnostic.level === 'error')
+      if (blockingDiagnostic) {
+        throw new Error(this.formatDiagnostics(compiledCode.diagnostics))
+      }
+
+      const fn = this.createSafeFunction(compiledCode.code, compiledCode.capturedVariables)
+      const execution = fn(this.context.variables, this.createBasket)
 
       Object.keys(execution.variables).forEach(key => {
         if (this.context.variables[key] !== execution.variables[key]) {
@@ -156,7 +240,7 @@ export class StrategyExecutor {
       })
 
       const result = execution.result
-      const controlFlow = execution.controlFlow || parsedCode.controlFlow
+      const controlFlow = execution.controlFlow || { type: 'none' }
 
       const executionTime = performance.now() - startTime
 
@@ -191,7 +275,7 @@ export class StrategyExecutor {
         cellLabel: cell.label,
         action: controlFlow?.type !== 'none' ? controlFlow?.type ?? 'next' : 'next',
         condition: controlFlow?.condition,
-        result: result != null ? String(result).slice(0, 100) : undefined,
+        result: result != null ? String(result).slice(0, 100) : this.formatDiagnostics(compiledCode.diagnostics),
         timestamp: Date.now(),
         branchTaken: controlFlow?.type !== 'none' && controlFlow?.type
           ? controlFlow.type === 'goto' ? `→ cell ${controlFlow.target}` : controlFlow.type
@@ -233,44 +317,6 @@ export class StrategyExecutor {
     }
   }
 
-  private parseControlFlow(code: string): { code: string; controlFlow: any } {
-    const lines = code.split('\n')
-    let modifiedCode = ''
-    let controlFlow = { type: 'none' }
-
-    for (const line of lines) {
-      const trimmed = line.trim()
-
-      if (trimmed.startsWith('if ')) {
-        const match = trimmed.match(/if\s+(.+):\s*(\w+)(?:\s+(.+))?/)
-        if (match) {
-          const [, condition, command, target] = match
-          if (command === 'next') {
-            modifiedCode += `if (${condition}) { __controlFlow__ = { type: 'next' }; __result__ = null; }\n`
-          } else if (command === 'goto') {
-            modifiedCode += `if (${condition}) { __controlFlow__ = { type: 'goto', target: ${target} }; __result__ = null; }\n`
-          }
-          continue
-        }
-      }
-
-      if (trimmed === 'next') {
-        modifiedCode += `__controlFlow__ = { type: 'next' }; __result__ = null;\n`
-        continue
-      }
-
-      if (trimmed.startsWith('goto ')) {
-        const target = trimmed.replace('goto ', '').trim()
-        modifiedCode += `__controlFlow__ = { type: 'goto', target: ${target} }; __result__ = null;\n`
-        continue
-      }
-
-      modifiedCode += line + '\n'
-    }
-
-    return { code: modifiedCode, controlFlow }
-  }
-
   public async executeAll(): Promise<{ cells: CodeCell[]; runTrace: RunTraceEntry[] }> {
     // Enforce loop guards before any cell runs
     const violations = validateLoopGuards(this.cells)
@@ -309,6 +355,8 @@ export class StrategyExecutor {
           currentIndex++
         } else if (result.controlFlow.type === 'goto' && result.controlFlow.target != null) {
           currentIndex = result.controlFlow.target
+        } else if (result.controlFlow.type === 'stop') {
+          break
         } else {
           currentIndex++
         }

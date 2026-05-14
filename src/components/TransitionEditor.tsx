@@ -199,29 +199,29 @@ export function TransitionEditor({ fromCell, toCell, rules, onRulesChange, cellC
       }
 
       if (!rule.condition) {
-        if (rule.action === 'next') return 'next'
-        if (rule.action === 'stop') return 'stop'
-        if (rule.action === 'pass') return 'pass'
-        if (rule.action === 'fail') return 'fail'
-        if (rule.action === 'missing_data') return 'missing_data'
-        if (rule.action === 'error') return 'error'
-        if (rule.action === 'goto' && rule.target != null) return `goto ${rule.target}`
-        if (rule.action === 'on_error' && rule.target != null) return `on_error: goto ${rule.target}`
-        if (rule.action === 'while' && rule.target != null) return `while ${rule.condition || 'true'}: goto ${rule.target}`
+        if (rule.action === 'next') return 'next()'
+        if (rule.action === 'stop') return 'stop()'
+        if (rule.action === 'pass') return 'pass()'
+        if (rule.action === 'fail') return 'fail()'
+        if (rule.action === 'missing_data') return 'missingData()'
+        if (rule.action === 'error') return 'fail("error")'
+        if (rule.action === 'goto' && rule.target != null) return `goto(${rule.target})`
+        if (rule.action === 'on_error' && rule.target != null) return `goto(${rule.target})`
+        if (rule.action === 'while' && rule.target != null) return `if (${rule.condition || 'true'}) { goto(${rule.target}) }`
         return ''
       }
 
-      const action = rule.action === 'next' ? 'next' : 
-                    rule.action === 'stop' ? 'stop' :
-                    rule.action === 'pass' ? 'pass' :
-                    rule.action === 'fail' ? 'fail' :
-                    rule.action === 'missing_data' ? 'missing_data' :
-                    rule.action === 'error' ? 'error' :
-                    rule.action === 'goto' && rule.target != null ? `goto ${rule.target}` :
-                    rule.action === 'on_error' && rule.target != null ? `on_error: goto ${rule.target}` :
-                    rule.action === 'while' && rule.target != null ? `goto ${rule.target}` : 'next'
+      const action = rule.action === 'next' ? 'next()' : 
+                    rule.action === 'stop' ? 'stop()' :
+                    rule.action === 'pass' ? 'pass()' :
+                    rule.action === 'fail' ? 'fail()' :
+                    rule.action === 'missing_data' ? 'missingData()' :
+                    rule.action === 'error' ? 'fail("error")' :
+                    rule.action === 'goto' && rule.target != null ? `goto(${rule.target})` :
+                    rule.action === 'on_error' && rule.target != null ? `goto(${rule.target})` :
+                    rule.action === 'while' && rule.target != null ? `goto(${rule.target})` : 'next()'
       
-      return `if ${rule.condition}:\n  ${action}`
+      return `if (${rule.condition}) {\n  ${action}\n}`
     }).filter(Boolean).join('\n')
   }
 

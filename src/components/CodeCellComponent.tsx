@@ -104,14 +104,15 @@ export function CodeCellComponent({
     onCellChange({ visualConfig })
     
     const conditionCode = conditions.map((c, i) => {
-      const logic = i > 0 && c.logic ? ` ${c.logic.toLowerCase()} ` : ''
+      const logic = i > 0 && c.logic ? ` ${c.logic === 'AND' ? '&&' : '||'} ` : ''
+      const operator = c.operator === '=' ? '===' : c.operator
       const condition = c.operator === 'between'
-        ? `${c.field}(cusip) >= ${c.value} and ${c.field}(cusip) <= ${c.value2}`
-        : `${c.field}(cusip) ${c.operator} ${typeof c.value === 'string' ? `"${c.value}"` : c.value}`
-      return `${i > 0 ? '\n' : ''}${logic}${condition}`
+        ? `${c.field}(cusip) >= ${c.value} && ${c.field}(cusip) <= ${c.value2}`
+        : `${c.field}(cusip) ${operator} ${typeof c.value === 'string' ? `"${c.value}"` : c.value}`
+      return `${logic}${condition}`
     }).join('')
     
-    onCodeChange(`if ${conditionCode}:\n  __result__ = "Match"`)
+    onCodeChange(`if (${conditionCode}) {\n  result("Match")\n}`)
   }
 
   const handleDataFieldsChange = (dataFields: string[]) => {

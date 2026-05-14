@@ -1089,28 +1089,28 @@ function App() {
               <h3 className="text-base font-medium mb-4">Control Flow & Syntax</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">if cond: next</span>
+                  <span className="text-accent font-semibold text-base">if (cond) &#123; next() &#125;</span>
                   <p className="text-muted-foreground mt-1.5 leading-relaxed">Skip to next cell if true</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">if cond: goto 5</span>
+                  <span className="text-accent font-semibold text-base">if (cond) &#123; goto(5) &#125;</span>
                   <p className="text-muted-foreground mt-1.5 leading-relaxed">Jump to cell 5 if true</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">goto 3</span>
+                  <span className="text-accent font-semibold text-base">goto(3)</span>
                   <p className="text-muted-foreground mt-1.5 leading-relaxed">Jump to cell 3</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">next</span>
-                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Skip to next cell</p>
+                  <span className="text-accent font-semibold text-base">basket IG_Core:</span>
+                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Declare a multi-CUSIP basket</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">__result__ = value</span>
+                  <span className="text-accent font-semibold text-base">result(value)</span>
                   <p className="text-muted-foreground mt-1.5 leading-relaxed">Set cell output</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">PRICE(cusip)</span>
-                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Get security price</p>
+                  <span className="text-accent font-semibold text-base">IG_Core.weightedAvg('YIELD')</span>
+                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Analyze a multi-CUSIP basket</p>
                 </div>
               </div>
             </div>

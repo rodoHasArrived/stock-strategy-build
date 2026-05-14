@@ -72,11 +72,16 @@ export function ContextInspector({ context }: ContextInspectorProps) {
           <h4 className="text-sm font-medium mb-2">Available Functions</h4>
           <div className="space-y-1 text-xs font-mono text-muted-foreground">
             <div>PRICE(cusip)</div>
+            <div>PRICE(basket)</div>
             <div>YIELD(cusip)</div>
+            <div>YIELD(basket)</div>
             <div>COUPON(cusip)</div>
             <div>DURATION(cusip)</div>
             <div>SPREAD(cusip)</div>
             <div>RATING(cusip)</div>
+            <div>basket.avg('YIELD')</div>
+            <div>basket.weightedAvg('DURATION')</div>
+            <div>result(value), next(), goto(5), stop()</div>
           </div>
         </div>
       </div>

@@ -65,7 +65,7 @@ const FORMULA_SUGGESTIONS: FormulaSuggestion[] = [
   },
   {
     id: 'duration-range',
-    formula: 'DURATION(cusip) >= min_duration and DURATION(cusip) <= max_duration',
+    formula: 'DURATION(cusip) >= min_duration && DURATION(cusip) <= max_duration',
     description: 'Duration range filter',
     category: 'comparison',
     context: ['duration']
@@ -114,24 +114,38 @@ const FORMULA_SUGGESTIONS: FormulaSuggestion[] = [
   },
   {
     id: 'conditional-next',
-    formula: 'if condition:\n  next',
+    formula: 'if (condition) {\n  next()\n}',
     description: 'Skip to next cell if condition true',
     category: 'common',
     context: ['if', 'next', 'condition']
   },
   {
     id: 'conditional-goto',
-    formula: 'if condition:\n  goto cell_index',
+    formula: 'if (condition) {\n  goto(cell_index)\n}',
     description: 'Jump to cell if condition true',
     category: 'common',
     context: ['if', 'goto']
   },
   {
     id: 'assign-result',
-    formula: '__result__ = calculated_value',
+    formula: 'result(calculated_value)',
     description: 'Set cell output',
     category: 'common',
     context: ['result', 'output']
+  },
+  {
+    id: 'basket-core',
+    formula: `basket IG_Core:\n  cusips:\n    US037833DK62\n    US594918BW44\n  weights:\n    US037833DK62: 0.55\n    US594918BW44: 0.45\n  tags: investment_grade, core`,
+    description: 'Create a weighted basket with multiple CUSIPs',
+    category: 'common',
+    context: ['basket', 'cusip', 'portfolio', 'core']
+  },
+  {
+    id: 'basket-weighted-yield',
+    formula: `avg_yield = IG_Core.weightedAvg('YIELD')\nresult(avg_yield)`,
+    description: 'Calculate weighted average yield for a basket',
+    category: 'yield',
+    context: ['basket', 'weighted', 'yield']
   }
 ]
 

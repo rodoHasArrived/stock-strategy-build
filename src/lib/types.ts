@@ -2,7 +2,7 @@ export type CellValue = string | number | boolean | null | any
 
 export type ExecutionStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped'
 
-export type ControlFlowType = 'next' | 'goto' | 'if' | 'loop' | 'while' | 'stop' | 'none'
+export type ControlFlowType = 'next' | 'goto' | 'if' | 'loop' | 'while' | 'stop' | 'pass' | 'fail' | 'missing_data' | 'none'
 
 export type CellMode = 'visual' | 'formula' | 'code'
 

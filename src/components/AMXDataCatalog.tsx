@@ -463,13 +463,13 @@ export function AMXDataCatalog({ onFieldSelect, selectedFields = [] }: AMXDataCa
       </div>
 
       <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-        <TabsList className="grid grid-cols-3 lg:grid-cols-6 h-auto">
+        <TabsList className="grid h-auto grid-cols-2 gap-1 p-1">
           {CATEGORIES.map((cat) => {
             const Icon = cat.icon
             return (
-              <TabsTrigger key={cat.id} value={cat.id} className="text-xs gap-1">
+              <TabsTrigger key={cat.id} value={cat.id} className="min-h-8 justify-start gap-1.5 px-2 text-xs">
                 <Icon size={14} />
-                <span className="hidden lg:inline">{cat.label}</span>
+                <span className="truncate">{cat.label}</span>
               </TabsTrigger>
             )
           })}

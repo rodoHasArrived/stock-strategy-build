@@ -201,6 +201,24 @@ return { action: 'hold', reason: \`Tech/Util ratio \${techUtilRatio.toFixed(2)} 
   }
 ]
 
+const getRowCount = (data: unknown) => {
+  if (Array.isArray(data)) return data.length
+  if (data && typeof data === 'object' && Array.isArray((data as { data?: unknown[] }).data)) {
+    return (data as { data: unknown[] }).data.length
+  }
+  return 0
+}
+
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+const formatPct = (value: number) => `${value.toFixed(2)}%`
+
 export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
   const [config, setConfig] = useState<BacktestConfig>({
     startCapital: 1000,
@@ -216,6 +234,31 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
   const [result, setResult] = useState<BacktestResult | null>(null)
   const [isRunning, setIsRunning] = useState(false)
   const [activeTab, setActiveTab] = useState('config')
+  const [lastRunSignature, setLastRunSignature] = useState<string | null>(null)
+
+  const activeUniverse = selectedDataset?.securities ?? Object.keys(dataFiles)
+  const loadedRows = Object.values(dataFiles).reduce((total, data) => total + getRowCount(data), 0)
+  const runSignature = JSON.stringify({
+    config,
+    strategyCode,
+    symbols: Object.keys(dataFiles).sort(),
+    rows: Object.entries(dataFiles)
+      .map(([symbol, data]) => [symbol, getRowCount(data)] as const)
+      .sort(([a], [b]) => a.localeCompare(b)),
+  })
+  const resultIsStale = Boolean(result && lastRunSignature !== runSignature)
+  const runStatus = isRunning
+    ? 'Running backtest'
+    : result
+      ? resultIsStale
+        ? 'Needs rerun after edits'
+        : `${result.trades.length} trades, ${formatPct(result.metrics.totalReturn)} total return`
+      : 'Ready to run'
+  const riskAssumptions = [
+    `${(config.transactionCost * 100).toFixed(2)}% cost`,
+    `${(config.volumeCapPct * 100).toFixed(0)}% volume cap`,
+    `${config.slippageModel} slippage`,
+  ].join(' / ')
 
   const handleFileUpload = async (symbol: string, file: File) => {
     try {
@@ -228,13 +271,28 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
     }
   }
 
-  const handleRun = async () => {
+  const updateConfig = (updates: Partial<BacktestConfig>) => {
+    setConfig(c => ({ ...c, ...updates }))
+  }
+
+  const loadDataset = (dataset: SampleDataset) => {
+    setDataFiles(dataset.data)
+    setStrategyCode(dataset.strategyTemplate)
+    setSelectedDataset(dataset)
+    toast.success(`Loaded ${dataset.name}`)
+  }
+
+  const handleRun = async (options: { notify?: boolean } = {}) => {
+    const { notify = true } = options
     setIsRunning(true)
     try {
       const backtestResult = await onRun(config, strategyCode, dataFiles)
       setResult(backtestResult)
+      setLastRunSignature(runSignature)
       setActiveTab('results')
-      toast.success('Backtest complete')
+      if (notify) {
+        toast.success('Backtest complete')
+      }
     } catch (error) {
       toast.error(`Backtest failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
@@ -245,48 +303,99 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
   useEffect(() => {
     const autoRun = async () => {
       await new Promise(resolve => setTimeout(resolve, 500))
-      await handleRun()
+      await handleRun({ notify: false })
     }
     autoRun()
   }, [])
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Backtest Builder</h2>
-          <p className="text-sm text-muted-foreground">Python-style strategy backtesting with pandas operations</p>
+    <div className="space-y-5">
+      <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-2xl font-semibold tracking-tight">Strategy Cockpit</h2>
+              {selectedDataset && (
+                <Badge variant="outline" className="h-6">
+                  {selectedDataset.category}
+                </Badge>
+              )}
+            </div>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              {selectedDataset
+                ? selectedDataset.description
+                : 'Custom strategy using uploaded JSON market data.'}
+            </p>
+          </div>
+          <Button onClick={() => handleRun()} disabled={isRunning} size="lg" className="self-start">
+            <PlayCircle size={20} className="mr-2" weight="fill" />
+            {isRunning ? 'Running...' : 'Run Backtest'}
+          </Button>
         </div>
-        <Button onClick={handleRun} disabled={isRunning} size="lg">
-          <PlayCircle size={20} className="mr-2" weight="fill" />
-          {isRunning ? 'Running...' : 'Run Backtest'}
-        </Button>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4">
+          <div className="rounded-md border bg-background p-3">
+            <div className="text-xs font-medium uppercase text-muted-foreground">Universe</div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {activeUniverse.length > 0 ? activeUniverse.map(symbol => (
+                <Badge key={symbol} variant="secondary" className="h-6">
+                  {symbol}
+                </Badge>
+              )) : (
+                <span className="text-sm text-muted-foreground">No symbols loaded</span>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-md border bg-background p-3">
+            <div className="text-xs font-medium uppercase text-muted-foreground">Data Window</div>
+            <div className="mt-1 text-sm font-medium">
+              {selectedDataset?.period ?? 'Custom upload'}
+            </div>
+            <div className="text-xs text-muted-foreground">{loadedRows.toLocaleString()} loaded rows</div>
+          </div>
+
+          <div className="rounded-md border bg-background p-3">
+            <div className="text-xs font-medium uppercase text-muted-foreground">Decision Lens</div>
+            <div className="mt-1 text-sm font-medium">{selectedDataset?.useCase ?? 'Custom signal logic'}</div>
+            <div className="text-xs text-muted-foreground">{riskAssumptions}</div>
+          </div>
+
+          <div className="rounded-md border bg-background p-3">
+            <div className="text-xs font-medium uppercase text-muted-foreground">Proof State</div>
+            <div className="mt-1 text-sm font-medium">{runStatus}</div>
+            <div className="text-xs text-muted-foreground">
+              {result ? `${formatCurrency(result.metrics.Final)} final value` : 'Run once to validate behavior'}
+            </div>
+          </div>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="config">Configuration</TabsTrigger>
-          <TabsTrigger value="data">Data Sources</TabsTrigger>
-          <TabsTrigger value="strategy">Strategy Code</TabsTrigger>
-          <TabsTrigger value="results">Results</TabsTrigger>
+        <TabsList className="grid h-11 w-full grid-cols-4">
+          <TabsTrigger value="config">1 Setup</TabsTrigger>
+          <TabsTrigger value="data">2 Data</TabsTrigger>
+          <TabsTrigger value="strategy">3 Logic</TabsTrigger>
+          <TabsTrigger value="results">4 Proof</TabsTrigger>
         </TabsList>
 
         <TabsContent value="config" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Backtest Configuration</CardTitle>
-              <CardDescription>Set initial capital, costs, and slippage parameters</CardDescription>
+              <CardTitle>Execution Assumptions</CardTitle>
+              <CardDescription>Set the capital, cost, liquidity, and slippage model that every strategy result must clear.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="start-capital">Starting Capital ($)</Label>
                   <Input
                     id="start-capital"
                     type="number"
                     value={config.startCapital}
-                    onChange={(e) => setConfig(c => ({ ...c, startCapital: parseFloat(e.target.value) }))}
+                    onChange={(e) => updateConfig({ startCapital: parseFloat(e.target.value) })}
                   />
+                  <p className="text-xs text-muted-foreground">Baseline portfolio value used for all reported returns.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="transaction-cost">Transaction Cost (decimal)</Label>
@@ -295,8 +404,9 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
                     type="number"
                     step="0.0001"
                     value={config.transactionCost}
-                    onChange={(e) => setConfig(c => ({ ...c, transactionCost: parseFloat(e.target.value) }))}
+                    onChange={(e) => updateConfig({ transactionCost: parseFloat(e.target.value) })}
                   />
+                  <p className="text-xs text-muted-foreground">Applied on each trade before performance metrics are calculated.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="volume-cap">Volume Cap (%)</Label>
@@ -305,14 +415,15 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
                     type="number"
                     step="0.01"
                     value={config.volumeCapPct}
-                    onChange={(e) => setConfig(c => ({ ...c, volumeCapPct: parseFloat(e.target.value) }))}
+                    onChange={(e) => updateConfig({ volumeCapPct: parseFloat(e.target.value) })}
                   />
+                  <p className="text-xs text-muted-foreground">Maximum participation rate allowed against daily volume.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="slippage-model">Slippage Model</Label>
                   <Select
                     value={config.slippageModel}
-                    onValueChange={(v: 'fixed' | 'adaptive' | 'custom') => setConfig(c => ({ ...c, slippageModel: v }))}
+                    onValueChange={(v: 'fixed' | 'adaptive' | 'custom') => updateConfig({ slippageModel: v })}
                   >
                     <SelectTrigger id="slippage-model">
                       <SelectValue />
@@ -323,6 +434,7 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
                       <SelectItem value="custom">Custom Function</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">Controls how execution price differs from observed close.</p>
                 </div>
               </div>
             </CardContent>
@@ -348,14 +460,16 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
                       <div
                         key={idx}
                         className={cn(
-                          "border rounded-lg p-4 space-y-2 hover:border-accent/50 transition-colors cursor-pointer",
+                          "border rounded-lg p-4 space-y-3 hover:border-accent/50 transition-colors cursor-pointer",
                           isSelected && "border-accent bg-accent/5"
                         )}
-                        onClick={() => {
-                          setDataFiles(dataset.data)
-                          setStrategyCode(dataset.strategyTemplate)
-                          setSelectedDataset(dataset)
-                          toast.success(`Loaded ${dataset.name}`)
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => loadDataset(dataset)}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          event.preventDefault()
+                          loadDataset(dataset)
                         }}
                       >
                         <div className="flex items-start justify-between">
@@ -367,6 +481,9 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
                                   ACTIVE
                                 </Badge>
                               )}
+                              <Badge variant="outline" className="text-[9px] h-4 px-1">
+                                {dataset.category}
+                              </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">{dataset.description}</p>
                           </div>
@@ -378,9 +495,10 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
                             </Badge>
                           ))}
                         </div>
-                        <div className="text-xs text-muted-foreground space-y-0.5 mt-2">
+                        <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                           <div>Period: {dataset.period}</div>
-                          <div>Use case: {dataset.useCase}</div>
+                          <div>Rows: {Object.values(dataset.data).reduce((total, data) => total + getRowCount(data), 0).toLocaleString()}</div>
+                          <div className="sm:col-span-2">Strategy fit: {dataset.useCase}</div>
                         </div>
                       </div>
                     )
@@ -482,10 +600,26 @@ export function BacktestBuilder({ onRun }: BacktestBuilderProps) {
           
           <Card>
             <CardHeader>
-              <CardTitle>Strategy Code</CardTitle>
-              <CardDescription>Write strategy logic - your function receives (df, state) where df is a DataFrame with 1 row of market data</CardDescription>
+              <CardTitle>Decision Logic</CardTitle>
+              <CardDescription>Write the rule that turns the active dataset into buy, sell, or hold decisions.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {selectedDataset && (
+                <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/30 p-3 text-sm md:grid-cols-3">
+                  <div>
+                    <Label className="text-xs uppercase text-muted-foreground">Dataset</Label>
+                    <div className="font-medium">{selectedDataset.name}</div>
+                  </div>
+                  <div>
+                    <Label className="text-xs uppercase text-muted-foreground">Signal Intent</Label>
+                    <div className="font-medium">{selectedDataset.useCase}</div>
+                  </div>
+                  <div>
+                    <Label className="text-xs uppercase text-muted-foreground">Tradable Symbols</Label>
+                    <div className="font-mono text-xs">{selectedDataset.securities.join(', ')}</div>
+                  </div>
+                </div>
+              )}
               <Textarea
                 value={strategyCode}
                 onChange={(e) => setStrategyCode(e.target.value)}
@@ -553,7 +687,24 @@ const price = data.PA_Close`}</pre>
               
               <EquityCurveChart data={result.equity} startCapital={config.startCapital} />
 
-              <div className="grid grid-cols-4 gap-4">
+              {resultIsStale && (
+                <Card className="border-warning/50 bg-warning/5">
+                  <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="font-medium">Proof needs rerun</div>
+                      <p className="text-sm text-muted-foreground">
+                        Data, logic, or execution assumptions changed after the last backtest.
+                      </p>
+                    </div>
+                    <Button onClick={() => handleRun()} disabled={isRunning} size="sm">
+                      <PlayCircle size={16} className="mr-2" weight="fill" />
+                      Rerun
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium">CAGR</CardTitle>
@@ -565,7 +716,7 @@ const price = data.PA_Close`}</pre>
                       ) : (
                         <TrendDown size={20} className="text-destructive" />
                       )}
-                      <span className="text-2xl font-semibold">{result.metrics.CAGR.toFixed(2)}%</span>
+                      <span className="text-2xl font-semibold">{formatPct(result.metrics.CAGR)}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -589,7 +740,7 @@ const price = data.PA_Close`}</pre>
                   <CardContent>
                     <div className="flex items-center gap-2">
                       <TrendDown size={20} className="text-destructive" />
-                      <span className="text-2xl font-semibold">{result.metrics.MaxDD.toFixed(2)}%</span>
+                      <span className="text-2xl font-semibold">{formatPct(result.metrics.MaxDD)}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -601,11 +752,37 @@ const price = data.PA_Close`}</pre>
                   <CardContent>
                     <div className="flex items-center gap-2">
                       <ChartLine size={20} className="text-accent" />
-                      <span className="text-2xl font-semibold">${result.metrics.Final.toFixed(2)}</span>
+                      <span className="text-2xl font-semibold">{formatCurrency(result.metrics.Final)}</span>
                     </div>
                   </CardContent>
                 </Card>
               </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Strategy Readout</CardTitle>
+                  <CardDescription>
+                    Interpret the run against the selected thesis and execution assumptions.
+                    {resultIsStale ? ' Current values reflect the previous run.' : ''}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
+                  <div className="rounded-md border bg-muted/20 p-3">
+                    <Label className="text-xs uppercase text-muted-foreground">Thesis Tested</Label>
+                    <p className="mt-1 font-medium">{selectedDataset?.useCase ?? 'Custom strategy logic'}</p>
+                  </div>
+                  <div className="rounded-md border bg-muted/20 p-3">
+                    <Label className="text-xs uppercase text-muted-foreground">Return Path</Label>
+                    <p className="mt-1 font-medium">
+                      {formatPct(result.metrics.totalReturn)} total return over {result.metrics.Years.toFixed(2)} years
+                    </p>
+                  </div>
+                  <div className="rounded-md border bg-muted/20 p-3">
+                    <Label className="text-xs uppercase text-muted-foreground">Execution Friction</Label>
+                    <p className="mt-1 font-medium">{riskAssumptions}</p>
+                  </div>
+                </CardContent>
+              </Card>
 
               <Card>
                 <CardHeader>
