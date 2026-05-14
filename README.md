@@ -1,22 +1,59 @@
-# ✨ Welcome to Your Spark Template!
-You've just launched your brand-new Spark Template Codespace — everything’s fired up and ready for you to explore, build, and create with Spark!
+# Strategy Executor - Investment Code Engine
 
-This template is your blank canvas. It comes with a minimal setup to help you get started quickly with Spark development.
+A comprehensive cell-based investment strategy builder with intelligent field selection and formula autocomplete.
 
-🚀 What's Inside?
-- A clean, minimal Spark environment
-- Pre-configured for local development
-- Ready to scale with your ideas
-  
-🧠 What Can You Do?
+## ✨ New Features
 
-Right now, this is just a starting point — the perfect place to begin building and testing your Spark applications.
+### 1. Field Picker with Search
+Never memorize field names again! Just search for what you need:
 
-🧹 Just Exploring?
-No problem! If you were just checking things out and don’t need to keep this code:
+**Example:** Type `"coupon"` to find:
+- `security.coupon_rate` - Annual interest rate
+- `security.coupon_frequency` - Payment frequency  
+- `security.next_coupon_date` - Next payment date
+- `security.accrued_interest` - Accumulated interest
 
-- Simply delete your Spark.
-- Everything will be cleaned up — no traces left behind.
+The field picker includes:
+- ⚡ Instant search across 30+ AMX data fields
+- 🏷️ Type badges (number, text, date, percentage)
+- 📁 Organized by category (Market, Fixed Income, Risk, etc.)
+- 💡 Descriptions and example values
+
+### 2. Formula Autocomplete
+Start typing a formula and get instant suggestions:
+
+**Example:** Type `current_yield = ` and choose from:
+- `annual_coupon / market_price`
+- `face_value * coupon_rate / clean_price`
+- `COUPON(cusip) / PRICE(cusip)`
+
+Features:
+- 🎯 Context-aware suggestions based on variable names
+- ⌨️ Keyboard navigation (↑↓ to browse, Enter/Tab to select)
+- 📚 Pre-built formulas for yields, durations, spreads, and returns
+- 🚀 Cmd+Enter to run immediately after inserting
+
+## 🚀 Quick Start
+
+1. **Create a new strategy cell**
+2. **Switch to Formula mode**
+3. **Start typing:** `current_yield = `
+4. **See autocomplete suggestions appear**
+5. **Navigate with arrow keys and press Enter to insert**
+
+Or use the **Visual mode** and click the field picker to search for fields visually!
+
+## 🧠 How It Works
+
+The app combines three modes for maximum flexibility:
+
+- **Visual Mode**: Drag-and-drop conditions with searchable field picker
+- **Formula Mode**: Excel-like formulas with intelligent autocomplete
+- **Code Mode**: Full Python-style control flow with autocomplete support
+
+All three modes sync automatically, so you can switch between them at any time.
+
+---
 
 📄 License For Spark Template Resources 
 

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Trash, DotsSixVertical } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+import { FieldPicker } from '@/components/FieldPicker'
 
 interface VisualBuilderProps {
   conditions: Condition[]
@@ -162,26 +163,12 @@ export function VisualBuilder({ conditions, onConditionsChange }: VisualBuilderP
                       <label className="text-xs text-muted-foreground mb-1 block">
                         Field
                       </label>
-                      <Select
+                      <FieldPicker
                         value={condition.field}
-                        onValueChange={(value) => updateCondition(index, { field: value })}
-                      >
-                        <SelectTrigger className="h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DATA_FIELDS.map(field => (
-                            <SelectItem key={field.value} value={field.value}>
-                              <div className="flex items-center gap-2">
-                                <span>{field.label}</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {field.type}
-                                </Badge>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onSelect={(field) => updateCondition(index, { field: field.function })}
+                        placeholder="Select field..."
+                        triggerClassName="h-9 w-full"
+                      />
                     </div>
 
                     <div>

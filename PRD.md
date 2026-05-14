@@ -82,12 +82,26 @@ A comprehensive cell-based investment strategy builder that enables users to cre
 - **Progression**: Click Explain → Decision tree shows → Trace back to source → View values → Export report
 - **Success criteria**: Complete lineage, clear visualization, PDF export, security-level explanations
 
+### Field Picker with Search
+- **Functionality**: Searchable dropdown for selecting AMX data fields without memorizing function names
+- **Purpose**: Eliminate need to remember exact field names - users can type keywords like "coupon" to find all related fields
+- **Trigger**: User clicks field selection dropdown in Visual Builder or Data Field Selector
+- **Progression**: Click field dropdown → Type search term (e.g., "coupon") → Results filtered to matching fields (coupon_rate, coupon_frequency, next_coupon_date, accrued_interest) → Click field to select → Field badge shows type (number/text/date/percentage)
+- **Success criteria**: Sub-100ms search response, fuzzy matching on field names and descriptions, grouped by category (Identity/Market/Fixed Income/Fundamental/Risk), shows field type and example values
+
+### Formula Autocomplete
+- **Functionality**: Context-aware formula suggestions that appear as user types variable assignments
+- **Purpose**: Accelerate formula writing and reduce errors by suggesting complete formulas based on variable context
+- **Trigger**: User types variable assignment followed by `=` in formula or code mode
+- **Progression**: Type "current_yield = " → System detects context → Autocomplete suggestions appear showing multiple formula options (annual_coupon / market_price, face_value * coupon_rate / clean_price, COUPON(cusip) / PRICE(cusip)) → User navigates with ↑↓ keys → Press Enter/Tab to insert suggestion → Formula auto-completes
+- **Success criteria**: Suggestions appear within 50ms of typing, arrow key navigation works smoothly, Enter/Tab inserts formula, Esc dismisses, suggestions contextually relevant to variable name, supports common patterns (yields, returns, spreads, durations)
+
 ### Visual Condition Builder
-- **Functionality**: Drag-and-drop interface for building complex conditional logic without writing code
+- **Functionality**: Drag-and-drop interface for building complex conditional logic without writing code, now integrated with Field Picker
 - **Purpose**: Allow non-technical users to create sophisticated filters and decision rules visually
 - **Trigger**: User switches to Visual mode tab in any cell
-- **Progression**: Click Add Condition → Select data field (PRICE, YIELD, COUPON, etc.) → Choose operator (>, <, =, between) → Enter value(s) → Add AND/OR logic connectors → Drag to reorder → Real-time code generation displays below → Switch to Code mode to see result
-- **Success criteria**: Smooth drag-and-drop, instant code generation, supports nested conditions, clear visual hierarchy, condition blocks show field type badges, between operator supports min/max values
+- **Progression**: Click Add Condition → Click field picker → Search for field (e.g., type "price") → Select from results → Choose operator (>, <, =, between) → Enter value(s) → Add AND/OR logic connectors → Drag to reorder → Real-time code generation displays below → Switch to Code mode to see result
+- **Success criteria**: Smooth drag-and-drop, instant code generation, supports nested conditions, clear visual hierarchy, searchable field picker replaces static dropdown, condition blocks show field type badges, between operator supports min/max values
 
 ### Data Field Selector
 - **Functionality**: Visual interface for selecting which AMX data fields to retrieve and display, organized by category (Market, Fundamental, Identity)

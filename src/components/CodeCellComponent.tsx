@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { CellComments } from '@/components/CellComments'
 import { Input } from '@/components/ui/input'
+import { FormulaAutocomplete } from '@/components/FormulaAutocomplete'
 
 interface CodeCellProps {
   cell: CodeCellType
@@ -286,34 +287,33 @@ export function CodeCellComponent({
 
           <TabsContent value="formula" className="mt-3">
             <div className="space-y-2">
-              <Textarea
-                ref={textareaRef}
+              <FormulaAutocomplete
                 value={cell.code}
-                onChange={(e) => onCodeChange(e.target.value)}
-                onFocus={() => setIsEditing(true)}
-                onBlur={() => setIsEditing(false)}
-                placeholder="Enter formula... (e.g., PRICE(cusip) > 100)"
-                className="font-mono text-sm min-h-[80px] resize-y bg-muted/30"
+                onChange={onCodeChange}
+                onRun={onRun}
+                placeholder="Enter formula... (e.g., current_yield = )"
+                className="min-h-[80px] bg-muted/30"
                 id={`cell-formula-${cell.index}`}
               />
               <div className="text-xs text-muted-foreground">
-                Use functions: PRICE(), YIELD(), COUPON(), DURATION(), SPREAD(), RATING(), SECTOR()
+                Start typing a variable name (e.g., "current_yield = ") to see formula suggestions
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="code" className="mt-3">
             <div className="space-y-2">
-              <Textarea
-                ref={textareaRef}
+              <FormulaAutocomplete
                 value={cell.code}
-                onChange={(e) => onCodeChange(e.target.value)}
-                onFocus={() => setIsEditing(true)}
-                onBlur={() => setIsEditing(false)}
+                onChange={onCodeChange}
+                onRun={onRun}
                 placeholder="Enter code... (use 'if condition: next', 'goto n', etc.)"
-                className="font-mono text-sm min-h-[80px] resize-y bg-muted/30"
+                className="min-h-[80px] bg-muted/30"
                 id={`cell-code-${cell.index}`}
               />
+              <div className="text-xs text-muted-foreground">
+                Press ↑↓ to navigate suggestions, Enter/Tab to accept, Cmd+Enter to run
+              </div>
             </div>
           </TabsContent>
         </Tabs>
