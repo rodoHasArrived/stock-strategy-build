@@ -84,21 +84,27 @@ export const strategyTemplates: StrategyTemplate[] = [
           index: 0,
           code: 'cusip = "US912828Z770"',
           output: '',
-          status: 'idle'
+          status: 'idle',
+          mode: 'code',
+          purpose: 'data'
         },
         {
           id: 'cell-1',
           index: 1,
           code: 'coupon = COUPON(cusip)\nprice = PRICE(cusip)\ncarry = coupon - ${fundingCost}\n__result__ = f"Carry: {carry}"',
           output: '',
-          status: 'idle'
+          status: 'idle',
+          mode: 'code',
+          purpose: 'calculation'
         },
         {
           id: 'cell-2',
           index: 2,
           code: 'if carry > 0: __result__ = "BUY"\nelse: __result__ = "PASS"',
           output: '',
-          status: 'idle'
+          status: 'idle',
+          mode: 'code',
+          purpose: 'condition'
         }
       ],
       parameters: [
@@ -120,21 +126,27 @@ export const strategyTemplates: StrategyTemplate[] = [
           index: 0,
           code: 'short_cusip = "US912828Z770"\nlong_cusip = "US912828ZG89"',
           output: '',
-          status: 'idle'
+          status: 'idle',
+          mode: 'code',
+          purpose: 'data'
         },
         {
           id: 'cell-1',
           index: 1,
           code: 'short_duration = DURATION(short_cusip)\nlong_duration = DURATION(long_cusip)\n__result__ = f"Short: {short_duration}, Long: {long_duration}"',
           output: '',
-          status: 'idle'
+          status: 'idle',
+          mode: 'code',
+          purpose: 'calculation'
         },
         {
           id: 'cell-2',
           index: 2,
           code: 'if short_duration < ${shortDuration} and long_duration > ${longDuration}:\n  __result__ = "Execute steepener trade"\nelse:\n  __result__ = "Wait for better entry"',
           output: '',
-          status: 'idle'
+          status: 'idle',
+          mode: 'code',
+          purpose: 'condition'
         }
       ],
       parameters: [
@@ -157,21 +169,27 @@ export const strategyTemplates: StrategyTemplate[] = [
           index: 0,
           code: 'cusip = "US172967MX75"',
           output: '',
-          status: 'idle'
+          status: 'idle',
+          mode: 'code',
+          purpose: 'data'
         },
         {
           id: 'cell-1',
           index: 1,
           code: 'spread = SPREAD(cusip)\nyield_val = YIELD(cusip)\n__result__ = f"Spread: {spread}bps, Yield: {yield_val}%"',
           output: '',
-          status: 'idle'
+          status: 'idle',
+          mode: 'code',
+          purpose: 'calculation'
         },
         {
           id: 'cell-2',
           index: 2,
           code: 'if spread > ${targetSpread}:\n  __result__ = "BUY - Wide spread"\nelse:\n  __result__ = "WATCH - Spread too tight"',
           output: '',
-          status: 'idle'
+          status: 'idle',
+          mode: 'code',
+          purpose: 'condition'
         }
       ],
       parameters: [

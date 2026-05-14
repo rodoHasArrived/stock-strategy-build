@@ -2,7 +2,20 @@ export type CellValue = string | number | boolean | null | any
 
 export type ExecutionStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped'
 
-export type ControlFlowType = 'next' | 'goto' | 'if' | 'none'
+export type ControlFlowType = 'next' | 'goto' | 'if' | 'loop' | 'stop' | 'none'
+
+export type CellMode = 'visual' | 'formula' | 'code'
+
+export type CellPurpose = 
+  | 'universe' 
+  | 'data' 
+  | 'calculation' 
+  | 'condition' 
+  | 'ranking' 
+  | 'portfolio' 
+  | 'risk' 
+  | 'trade'
+  | 'general'
 
 export interface Cell {
   id: string
@@ -24,10 +37,20 @@ export interface CodeCell {
   error?: string
   status: ExecutionStatus
   executionTime?: number
+  mode: CellMode
+  purpose: CellPurpose
+  label?: string
   controlFlow?: {
     type: ControlFlowType
     target?: number
     condition?: string
+  }
+  visualConfig?: {
+    conditions?: Condition[]
+    dataFields?: string[]
+    aggregation?: 'sum' | 'avg' | 'max' | 'min' | 'count'
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
   }
 }
 

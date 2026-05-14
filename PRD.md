@@ -1,58 +1,86 @@
 # Planning Guide
 
-A sophisticated notebook-style code cell execution engine for investment strategies that allows users to create sequential logic flows with control statements (if/next/goto) while maintaining access to market data, parameters, and variables from previous cells.
+A comprehensive cell-based investment strategy builder that enables users to create, test, and deploy security selection and portfolio construction logic through an intuitive visual and code-based interface supporting AMX market and fundamental data integration.
 
 **Experience Qualities**: 
-1. **Professional** - Interface should feel like a serious financial tool with precision controls and clear data hierarchy
-2. **Empowering** - Users should feel capable of building complex strategies without coding knowledge through progressive feature discovery
-3. **Transparent** - Every calculation and condition should be visible and traceable, building trust in the strategy engine
+1. **Professional** - Interface should feel like institutional-grade financial software with precision controls, clear data hierarchy, and confidence-inspiring design
+2. **Empowering** - Users transition from visual builder mode to advanced code as their expertise grows, with progressive feature discovery and intelligent defaults
+3. **Transparent** - Every calculation, condition, and decision is traceable with data lineage, audit logs, and explainable outputs at the security level
 
 **Complexity Level**: Complex Application (advanced functionality, likely with multiple views)
-- This is a sophisticated code execution engine requiring sequential cell execution, control flow management (if/next/goto), variable scope tracking across cells, market data integration, and execution state visualization with support for loops and conditional branching.
+- This is a sophisticated investment strategy engine supporting visual builder mode, formula mode, and advanced code mode. It includes sequential cell execution, control flow management (if/next/goto/loop/stop), variable scope tracking, AMX market and fundamental data integration, live previews, validation, data lineage, versioning, backtesting, and explainable security-level decision outputs.
 
 ## Essential Features
 
-### Code Cell Execution Engine
-- **Functionality**: Notebook-style sequential code cells that execute in order, each cell can contain logic, calculations, and control flow statements
-- **Purpose**: Provides familiar notebook interface for building investment strategies with procedural logic flow and variable passing between cells
-- **Trigger**: User clicks "Run" on a cell or "Run All" to execute strategy
-- **Progression**: Click Run → Cells execute sequentially (0, 1, 2...) → Variables from previous cells accessible → Control flow (if/next/goto) determines execution path → Output displays in cell → Execution state visualized
-- **Success criteria**: Sequential execution works, variables persist across cells, control flow statements redirect execution correctly, no infinite loops
+### Multi-Mode Cell Interface
+- **Functionality**: Each cell supports three modes - Visual Builder (drag-and-drop conditions), Formula Mode (Excel-like), and Advanced Code Mode (Python-style)
+- **Purpose**: Enable non-technical users to start with visual mode and progressively learn more advanced techniques as they grow
+- **Trigger**: User toggles mode selector in cell header (Visual/Formula/Code buttons)
+- **Progression**: Select Visual mode → Drag condition blocks → Configure thresholds → Preview results → Switch to Formula mode to see generated expression → Switch to Code for full control → Live preview updates in all modes
+- **Success criteria**: Mode switching preserves intent, visual builder generates valid code, formula syntax highlighting works, code autocomplete suggests functions and variables
 
-### Control Flow Statements
-- **Functionality**: Support for if/else conditionals, next (skip to next cell), goto (jump to specific cell), and loop control
-- **Purpose**: Enable complex strategy logic with branching, conditional execution, and iterative processing
-- **Trigger**: User writes control flow keyword in cell code (if condition: next, goto cell_5, etc.)
-- **Progression**: Cell executes → Evaluates condition → Control flow statement determines next cell → Execution jumps accordingly → Loop detection prevents infinite execution
-- **Success criteria**: if/else works correctly, goto jumps to correct cell, next skips current iteration, max 1000 iterations prevent infinite loops
+### Cell Purpose Classification
+- **Functionality**: Cells can be tagged by purpose - Universe Definition, Data Retrieval, Calculation, Condition, Ranking, Portfolio Construction, Risk Check, Trade Generation
+- **Purpose**: Organize complex strategies with clear visual indication of each cell's role in the workflow
+- **Trigger**: User selects purpose from dropdown when creating/editing cell
+- **Progression**: Click Add Cell → Select purpose → Cell UI adapts with relevant templates and suggestions → Purpose badge displays on cell → Execution flow diagram highlights cell type
+- **Success criteria**: Purpose-specific templates accelerate cell creation, visual flow diagram shows strategy structure at a glance, filtering by purpose works
 
-### Variable Scope & Context
-- **Functionality**: Variables defined in previous cells are accessible in all subsequent cells, creating execution context
-- **Purpose**: Build complex multi-step strategies where each cell builds on previous calculations
+### AMX Data Integration
+- **Functionality**: Direct access to AMX fundamental data (coupon, maturity, rating, sector) and market data (price, yield, spread, duration) via simple function calls
+- **Purpose**: Eliminate data integration complexity so users focus on strategy logic rather than data plumbing
+- **Trigger**: User types data function in code (PRICE, YIELD, COUPON, DURATION, SPREAD, RATING, SECTOR) or selects field in visual builder
+- **Progression**: Type PRICE( → Autocomplete shows available CUSIPs → Select security → Function returns live price → Data refreshes on market updates → Stale data highlighted
+- **Success criteria**: Sub-500ms data retrieval, supports 1000+ securities, handles missing data gracefully with null values, shows last update timestamp
+
+### Control Flow & Looping
+- **Functionality**: Support for if/else conditionals, next (skip to next cell), goto (jump to cell), loop (iterate), stop (halt execution), and error handling paths
+- **Purpose**: Enable complex multi-step strategies with branching logic, iterative processing, and controlled execution flow
+- **Trigger**: User writes control flow keywords in code or uses visual flow builder to connect cells
+- **Progression**: Cell executes → Evaluates condition → Control flow statement determines next cell → Visual execution path highlights → Jumps to target cell → Loop counter increments → Max iterations prevents infinite loops
+- **Success criteria**: if/else branches correctly, goto jumps to specified cell index, loops iterate correctly, max 1000 iterations enforced, stop halts cleanly
+
+### Variable Scope & Live Preview
+- **Functionality**: Variables defined in previous cells are accessible in all subsequent cells with live preview of values as you type
+- **Purpose**: Build complex multi-step strategies where each cell builds on previous calculations with immediate visual feedback
 - **Trigger**: User references variable from earlier cell in current cell code
-- **Progression**: Cell 0 defines price = 100 → Cell 1 references price → Cell 1 can use/modify price → All cells maintain variable state → Execution context shown in sidebar
-- **Success criteria**: Variables accessible across cells, scope clear, context inspector shows all variables and values
+- **Progression**: Cell 0 defines price = 100 → Cell 1 types price → Autocomplete shows value → Inline preview displays current value → Variable tracking panel updates → All dependent cells marked for recalculation
+- **Success criteria**: Variables accessible across cells, live preview shows current values, dependency graph correctly identifies affected cells, context inspector shows complete variable state
 
-### Market Data Integration
-- **Functionality**: Access to security fundamentals (coupon, maturity, rating) and market data (price, yield, spread)
-- **Purpose**: Provide real-time data for strategy calculations like yield-to-maturity, current yield, price-to-carry
-- **Trigger**: User references data in formula (e.g., =PRICE("CUSIP123") or =YIELD(A1))
-- **Progression**: Type data function → Autocomplete suggests available fields → Select security identifier → Formula returns live value → Updates on data refresh
-- **Success criteria**: Data loads within 500ms, supports 100+ securities, handles missing data gracefully
+### Security Universe & Filtering
+- **Functionality**: Define security universes through filters (sector, rating, maturity) and rank/sort based on computed metrics
+- **Purpose**: Build portfolios from filtered and ranked security sets matching investment criteria
+- **Trigger**: User creates Universe cell and specifies filter conditions
+- **Progression**: Select Universe purpose → Add filters (rating >= AA, sector = Financial) → Apply filters to security set → Preview filtered list → Pass universe to next cell → Rank by computed metric
+- **Success criteria**: Filters reduce universe correctly, ranking sorts properly, filtered sets pass between cells, preview shows security count and top matches
 
-### Strategy Templates & Examples
-- **Functionality**: Pre-built strategies (carry trade, yield curve, credit spread) users can load and modify
-- **Purpose**: Accelerate learning and provide best-practice starting points
-- **Trigger**: User clicks "Load Template" from strategy gallery
-- **Progression**: Browse templates → Preview description → Click load → Strategy populates grid → User customizes parameters → Save as new strategy
-- **Success criteria**: 5+ templates available, load instantly, clearly documented
+### Live Backtesting Engine
+- **Functionality**: Run strategy against historical AMX data to validate performance and identify edge cases
+- **Purpose**: Validate strategy logic before live deployment with detailed trade-level analysis
+- **Trigger**: User clicks "Run Backtest" and selects date range
+- **Progression**: Click Backtest → Select start/end dates → Engine evaluates conditions against historical snapshots → Display matched trades with entry/exit → Calculate P&L and metrics → Export results to CSV → Identify periods where strategy underperformed
+- **Success criteria**: Processes 1 year of daily data in <5 seconds, accurate trade matching, detailed performance attribution, explainable security-level decisions
 
-### Backtest Simulation
-- **Functionality**: Run strategy against historical data to validate performance
-- **Purpose**: Validate strategy logic before live deployment
-- **Trigger**: User clicks "Run Backtest" button
-- **Progression**: Click backtest → Select date range → Engine evaluates conditions against historical data → Display matched trades → Show P&L and metrics → Export results
-- **Success criteria**: Processes 1 year of daily data in <3 seconds, accurate trade matching
+### Strategy Templates & Gallery
+- **Functionality**: Pre-built strategies (carry trade, yield curve steepener, credit spread compression) users can load, preview, and customize
+- **Purpose**: Accelerate learning with best-practice examples and provide starting points for common investment approaches
+- **Trigger**: User clicks "Templates" button in header
+- **Progression**: Click Templates → Gallery opens → Preview strategy → Click Load → Strategy populates → Customize parameters → Save as new
+- **Success criteria**: 3+ templates covering major strategies, instant load, clear documentation
+
+### Audit Log & Version History
+- **Functionality**: Automatic versioning of strategy changes with complete audit trail
+- **Purpose**: Enable rollback to previous versions and maintain compliance audit trail
+- **Trigger**: Auto-save on every change, manual "Save Version" for milestones
+- **Progression**: Edits auto-save → View history → Preview diff → Restore version → Audit log tracks changes
+- **Success criteria**: Zero data loss, clear version diffs, successful restore, immutable audit log
+
+### Data Lineage & Explainability
+- **Functionality**: Trace any output value back through complete calculation chain to source data
+- **Purpose**: Understand exactly why a security was selected or rejected
+- **Trigger**: User clicks "Explain" on cell output or security in results
+- **Progression**: Click Explain → Decision tree shows → Trace back to source → View values → Export report
+- **Success criteria**: Complete lineage, clear visualization, PDF export, security-level explanations
 
 ## Edge Case Handling
 

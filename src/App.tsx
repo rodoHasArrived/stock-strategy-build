@@ -12,22 +12,28 @@ import { FloppyDisk, Code, Plus, PlayCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 
+const createDefaultCell = (index: number, code: string = ''): CodeCell => ({
+  id: `cell-${index}`,
+  index,
+  code,
+  output: '',
+  status: 'idle',
+  mode: 'code',
+  purpose: 'general'
+})
+
+const createDefaultStrategy = (): Strategy => ({
+  id: 'default',
+  name: 'New Strategy',
+  description: '',
+  cells: [createDefaultCell(0)],
+  parameters: [],
+  createdAt: Date.now(),
+  updatedAt: Date.now()
+})
+
 function App() {
-  const [strategy, setStrategy] = useKV<Strategy>('current-strategy', {
-    id: 'default',
-    name: 'New Strategy',
-    description: '',
-    cells: [{
-      id: 'cell-0',
-      index: 0,
-      code: '',
-      output: '',
-      status: 'idle'
-    }],
-    parameters: [],
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  })
+  const [strategy, setStrategy] = useKV<Strategy>('current-strategy', createDefaultStrategy())
 
   const [executionContext, setExecutionContext] = useState<ExecutionContext>({
     variables: {},
@@ -39,21 +45,7 @@ function App() {
   const handleCellCodeChange = (index: number, code: string) => {
     setStrategy((current) => {
       if (!current || !Array.isArray(current.cells)) {
-        return {
-          id: 'default',
-          name: 'New Strategy',
-          description: '',
-          cells: [{
-            id: 'cell-0',
-            index: 0,
-            code,
-            output: '',
-            status: 'idle'
-          }],
-          parameters: [],
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        }
+        return createDefaultStrategy()
       }
       const newCells = [...current.cells]
       newCells[index] = { ...newCells[index], code }
@@ -68,21 +60,7 @@ function App() {
   const handleDeleteCell = (index: number) => {
     setStrategy((current) => {
       if (!current || !Array.isArray(current.cells)) {
-        return {
-          id: 'default',
-          name: 'New Strategy',
-          description: '',
-          cells: [{
-            id: 'cell-0',
-            index: 0,
-            code: '',
-            output: '',
-            status: 'idle'
-          }],
-          parameters: [],
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        }
+        return createDefaultStrategy()
       }
       const newCells = current.cells.filter((_, i) => i !== index)
       const reindexedCells = newCells.map((cell, i) => ({
@@ -92,13 +70,7 @@ function App() {
       }))
       return {
         ...current,
-        cells: reindexedCells.length > 0 ? reindexedCells : [{
-          id: 'cell-0',
-          index: 0,
-          code: '',
-          output: '',
-          status: 'idle'
-        }],
+        cells: reindexedCells.length > 0 ? reindexedCells : [createDefaultCell(0)],
         updatedAt: Date.now()
       }
     })
@@ -107,36 +79,10 @@ function App() {
   const handleAddCell = () => {
     setStrategy((current) => {
       if (!current || !Array.isArray(current.cells)) {
-        return {
-          id: 'default',
-          name: 'New Strategy',
-          description: '',
-          cells: [{
-            id: 'cell-0',
-            index: 0,
-            code: '',
-            output: '',
-            status: 'idle'
-          }, {
-            id: 'cell-1',
-            index: 1,
-            code: '',
-            output: '',
-            status: 'idle'
-          }],
-          parameters: [],
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        }
+        return createDefaultStrategy()
       }
       const newIndex = current.cells.length
-      const newCell: CodeCell = {
-        id: `cell-${newIndex}`,
-        index: newIndex,
-        code: '',
-        output: '',
-        status: 'idle'
-      }
+      const newCell: CodeCell = createDefaultCell(newIndex)
       return {
         ...current,
         cells: [...current.cells, newCell],
@@ -152,21 +98,7 @@ function App() {
     
     setStrategy((current) => {
       if (!current || !Array.isArray(current.cells)) {
-        return {
-          id: 'default',
-          name: 'New Strategy',
-          description: '',
-          cells: [{
-            id: 'cell-0',
-            index: 0,
-            code: '',
-            output: '',
-            status: 'idle'
-          }],
-          parameters: [],
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        }
+        return createDefaultStrategy()
       }
       const newCells = [...current.cells]
       newCells[index] = { ...newCells[index], status: 'running' }
@@ -177,15 +109,9 @@ function App() {
     
     setStrategy((current) => {
       if (!current || !Array.isArray(current.cells)) {
-        return {
-          id: 'default',
-          name: 'New Strategy',
-          description: '',
-          cells: [result],
-          parameters: [],
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        }
+        const defaultStrat = createDefaultStrategy()
+        defaultStrat.cells[0] = result
+        return defaultStrat
       }
       const newCells = [...current.cells]
       newCells[index] = result
@@ -203,21 +129,7 @@ function App() {
     const executor = new StrategyExecutor(strategy.cells, strategy.parameters)
     
     setStrategy((current) => {
-      const defaultStrategy: Strategy = {
-        id: 'default',
-        name: 'New Strategy',
-        description: '',
-        cells: [{
-          id: 'cell-0',
-          index: 0,
-          code: '',
-          output: '',
-          status: 'idle'
-        }],
-        parameters: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      }
+      const defaultStrategy = createDefaultStrategy()
       
       if (!current || !Array.isArray(current.cells)) return defaultStrategy
       return {
@@ -229,15 +141,8 @@ function App() {
     const results = await executor.executeAll()
     
     setStrategy((current) => {
-      const defaultStrategy: Strategy = {
-        id: 'default',
-        name: 'New Strategy',
-        description: '',
-        cells: results,
-        parameters: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      }
+      const defaultStrategy = createDefaultStrategy()
+      defaultStrategy.cells = results
       
       if (!current) return defaultStrategy
       return {
@@ -254,21 +159,9 @@ function App() {
   const handleParametersChange = (parameters: Parameter[]) => {
     setStrategy((current) => {
       if (!current) {
-        return {
-          id: 'default',
-          name: 'New Strategy',
-          description: '',
-          cells: [{
-            id: 'cell-0',
-            index: 0,
-            code: '',
-            output: '',
-            status: 'idle'
-          }],
-          parameters,
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        }
+        const defaultStrat = createDefaultStrategy()
+        defaultStrat.parameters = parameters
+        return defaultStrat
       }
       return {
         ...current,
@@ -281,21 +174,9 @@ function App() {
   const handleNameChange = (name: string) => {
     setStrategy((current) => {
       if (!current) {
-        return {
-          id: 'default',
-          name,
-          description: '',
-          cells: [{
-            id: 'cell-0',
-            index: 0,
-            code: '',
-            output: '',
-            status: 'idle'
-          }],
-          parameters: [],
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        }
+        const defaultStrat = createDefaultStrategy()
+        defaultStrat.name = name
+        return defaultStrat
       }
       return {
         ...current,
