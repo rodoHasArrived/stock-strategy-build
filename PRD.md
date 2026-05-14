@@ -97,11 +97,32 @@ A comprehensive cell-based investment strategy builder that enables users to cre
 - **Success criteria**: Suggestions appear within 50ms of typing, arrow key navigation works smoothly, Enter/Tab inserts formula, Esc dismisses, suggestions contextually relevant to variable name, supports common patterns (yields, returns, spreads, durations)
 
 ### Python-Style Backtesting Engine
-- **Functionality**: Full-featured backtesting environment with pandas-like DataFrame operations, JSON data loading, rolling window calculations, and comprehensive performance metrics (CAGR, Sharpe, Sortino, Calmar, MaxDD)
-- **Purpose**: Enable quantitative traders to validate strategies using Python-style syntax with realistic slippage models, transaction costs, and volume constraints before live deployment
+- **Functionality**: Full-featured backtesting environment with pandas-like DataFrame operations, JSON data loading, rolling window calculations, comprehensive performance metrics (CAGR, Sharpe, Sortino, Calmar, MaxDD), equity curve visualization, and multi-asset portfolio rebalancing
+- **Purpose**: Enable quantitative traders to validate strategies using Python-style syntax with realistic slippage models, transaction costs, volume constraints, and visual equity curve analysis before live deployment
 - **Trigger**: User clicks Backtest tab in main navigation
-- **Progression**: Upload JSON price/volume data → Configure backtest parameters (starting capital, transaction costs, volume cap %, slippage model) → Write Python-style strategy code using DataFrame API (merge, rolling, ffill, pctChange) → Define trading signals (buy/sell/hold with reasons) → Click Run Backtest → View equity curve, trade history, and performance metrics → Export results
-- **Success criteria**: Sub-second execution for 250+ day backtests, accurate implementation of adaptive slippage based on ADV, comprehensive metrics dashboard with visual feedback, trade-by-trade breakdown with execution prices, support for dividend reinvestment, realistic partial fill simulation based on volume caps
+- **Progression**: Upload JSON price/volume data for multiple assets → Configure backtest parameters (starting capital, transaction costs, volume cap %, slippage model, rebalance frequency) → Write Python-style strategy code using DataFrame API (merge, rolling, ffill, pctChange) → Define trading signals (buy/sell/hold with reasons) or portfolio allocation targets → Click Run Backtest → View interactive equity curve chart with drawdown overlay → Analyze performance metrics dashboard → Review trade-by-trade breakdown → Export results
+- **Success criteria**: Sub-second execution for 250+ day backtests, accurate implementation of adaptive slippage based on ADV, comprehensive metrics dashboard with visual feedback, interactive equity curve with zoom/pan, drawdown visualization showing peak-to-trough declines, trade-by-trade breakdown with execution prices, support for dividend reinvestment, realistic partial fill simulation based on volume caps, multi-asset portfolio rebalancing with drift tracking
+
+### Equity Curve Visualization
+- **Functionality**: Interactive chart displaying portfolio value over time with area fill, reference lines, drawdown overlay, and detailed tooltips showing returns, holdings, and drawdown at each point
+- **Purpose**: Provide visual feedback on strategy performance, identify periods of gains/losses, and visualize maximum drawdown events
+- **Trigger**: Backtest completes successfully and results tab loads
+- **Progression**: Backtest runs → Results calculated → Equity curve chart renders showing portfolio value progression → User hovers to see detailed tooltip (date, value, return %, drawdown %, current holding) → Separate drawdown chart shows decline from peak → Maximum drawdown highlighted with label → Chart uses area gradient for visual depth → Reference line shows starting capital
+- **Success criteria**: Smooth rendering for 1000+ data points, responsive hover interactions, clear visual distinction between positive/negative periods, accurate drawdown calculation from peak equity, professional financial chart styling, legend showing total return percentage, max drawdown value prominently displayed
+
+### Multi-Asset Rebalancing
+- **Functionality**: Support for strategies that trade multiple securities or asset classes with periodic rebalancing based on target allocations and drift thresholds
+- **Purpose**: Enable portfolio construction strategies that maintain target weights across assets rather than single-asset momentum/mean-reversion patterns
+- **Trigger**: User writes strategy code defining target allocations object and drift thresholds
+- **Progression**: Define target allocations for asset classes (equity: 60%, fixed_income: 30%, alternatives: 10%) → Set drift threshold (5%) → Backtest engine tracks current allocations → When drift exceeds threshold, rebalance trades generated → Partial fills based on volume constraints applied → Cash and positions updated → Holdings passed to next period → Equity curve reflects rebalanced portfolio → Trade history shows rebalance orders with reasons
+- **Success criteria**: Accurate allocation drift calculation, correct rebalancing trade generation, supports unlimited asset classes, handles missing data for specific assets, cash management across rebalances, dividend/coupon income credited to cash, visualizes allocation drift in results
+
+### Strategy Template Gallery Expansion
+- **Functionality**: Pre-built templates now include common trading patterns (Z-score mean reversion, momentum breakout, pairs trading, multi-asset rebalancing) in addition to fixed income and equity selection strategies
+- **Purpose**: Provide starting points for quantitative trading strategies beyond traditional buy-and-hold security selection
+- **Trigger**: User clicks "Load Template" button and browses gallery
+- **Progression**: Click Load Template → Gallery opens with tabs for categories (Fixed Income / Equity / Portfolio / Trading) → Browse trading templates showing preview of cell count, parameters, and description → Click template card to preview full strategy → Load template to populate cells → Customize parameters for specific securities or thresholds → Run backtest to validate → Save as new strategy
+- **Success criteria**: 15+ templates covering major strategies, categorized clearly, templates include Z-score mean reversion between pairs, momentum breakout with volume confirmation, statistical arbitrage pairs trading with cointegration, multi-asset portfolio rebalancing, instant load without errors, comprehensive documentation in template descriptions, realistic parameter defaults
 
 ### Visual Condition Builder
 - **Functionality**: Drag-and-drop interface for building complex conditional logic without writing code, now integrated with Field Picker

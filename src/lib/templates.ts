@@ -528,6 +528,346 @@ __result__ = 'Portfolio duration: ' + portfolio_duration.toFixed(2) + (duration_
   },
   
   {
+    id: 'z-score-mean-reversion',
+    name: 'Z-Score Mean Reversion Strategy',
+    description: 'Trade pairs of securities based on normalized spread mean reversion using z-score thresholds',
+    category: 'Trading',
+    strategy: {
+      name: 'Z-Score Mean Reversion Strategy',
+      description: 'Trade pairs of securities based on normalized spread mean reversion using z-score thresholds',
+      cells: [
+        createCell(0, `lookback_period = 60
+min_lookback = 20
+z_enter_threshold = 0.25
+z_exit_threshold = 0.75
+symbol_A = 'PA'
+symbol_B = 'PB'`, 'general', 'Strategy Parameters'),
+        
+        createCell(1, `price_A = PRICE(symbol_A)
+price_B = PRICE(symbol_B)
+yield_A = YIELD(symbol_A)
+yield_B = YIELD(symbol_B)
+__result__ = symbol_A + ': $' + price_A + ' @ ' + yield_A + '% | ' + symbol_B + ': $' + price_B + ' @ ' + yield_B + '%'`, 'data', 'Fetch Current Prices'),
+        
+        createCell(2, `yield_spread = yield_A - yield_B
+spread_history = ROLLING_HISTORY('yield_spread', lookback_period)
+__result__ = 'Current spread: ' + yield_spread.toFixed(2) + 'bps | History: ' + spread_history.length + ' points'`, 'calculation', 'Calculate Yield Spread'),
+        
+        createCell(3, `if (spread_history.length >= min_lookback) {
+  spread_mean = spread_history.reduce((sum, v) => sum + v, 0) / spread_history.length
+  spread_variance = spread_history.reduce((sum, v) => sum + Math.pow(v - spread_mean, 2), 0) / spread_history.length
+  spread_std = Math.sqrt(spread_variance)
+  z_score = (yield_spread - spread_mean) / spread_std
+  __result__ = 'Mean: ' + spread_mean.toFixed(2) + ' | StdDev: ' + spread_std.toFixed(2) + ' | Z-Score: ' + z_score.toFixed(2)
+} else {
+  __result__ = 'Insufficient history (' + spread_history.length + '/' + min_lookback + ') - waiting for more data'
+  next
+}`, 'calculation', 'Calculate Z-Score'),
+        
+        createCell(4, `current_holding = CURRENT_POSITION()
+target_position = current_holding
+signal_reason = 'HOLD_CURRENT'
+
+if (!current_holding || current_holding === symbol_A) {
+  if (z_score < -z_enter_threshold) {
+    target_position = symbol_B
+    signal_reason = 'BUY_' + symbol_B + '_Z_BELOW_THRESHOLD'
+  }
+} else if (current_holding === symbol_B) {
+  if (z_score > z_exit_threshold) {
+    target_position = symbol_A
+    signal_reason = 'RETURN_TO_' + symbol_A + '_Z_ABOVE_THRESHOLD'
+  }
+}
+
+__result__ = 'Current: ' + (current_holding || 'None') + ' | Target: ' + target_position + ' | Reason: ' + signal_reason`, 'condition', 'Generate Trading Signal'),
+        
+        createCell(5, `trades = []
+
+if (target_position !== current_holding) {
+  if (current_holding) {
+    trades.push({
+      symbol: current_holding,
+      action: 'sell',
+      reason: 'SWITCH_TO_' + target_position,
+      z_score: z_score
+    })
+  }
+  
+  if (target_position) {
+    trades.push({
+      symbol: target_position,
+      action: 'buy',
+      reason: signal_reason,
+      z_score: z_score
+    })
+  }
+  
+  __result__ = 'Generated ' + trades.length + ' trade(s): ' + trades.map(t => t.action + ' ' + t.symbol).join(', ')
+} else {
+  __result__ = 'No trades - holding position in ' + (current_holding || 'cash')
+}`, 'trade', 'Execute Trades')
+      ],
+      parameters: [
+        { id: 'p1', name: 'lookback_period', value: 60, type: 'number', description: 'Rolling window for mean/std' },
+        { id: 'p2', name: 'z_enter_threshold', value: 0.25, type: 'number', description: 'Z-score to enter position' },
+        { id: 'p3', name: 'z_exit_threshold', value: 0.75, type: 'number', description: 'Z-score to exit position' }
+      ]
+    }
+  },
+  
+  {
+    id: 'momentum-breakout',
+    name: 'Momentum Breakout Strategy',
+    description: 'Identify and trade securities breaking out above moving average with strong momentum',
+    category: 'Trading',
+    strategy: {
+      name: 'Momentum Breakout Strategy',
+      description: 'Identify and trade securities breaking out above moving average with strong momentum',
+      cells: [
+        createCell(0, `ma_period = 20
+breakout_threshold = 1.02
+min_volume_ratio = 1.5
+hold_period_days = 10`, 'general', 'Parameters'),
+        
+        createCell(1, `candidates = securities.filter(s => s.price > 0)
+price_history = {}
+volume_history = {}
+
+candidates.forEach(s => {
+  price_history[s.cusip] = PRICE_HISTORY(s.cusip, ma_period + 5)
+  volume_history[s.cusip] = VOLUME_HISTORY(s.cusip, ma_period + 5)
+})
+
+__result__ = 'Loaded history for ' + candidates.length + ' securities'`, 'data', 'Load Price & Volume Data'),
+        
+        createCell(2, `breakout_candidates = []
+
+candidates.forEach(s => {
+  const prices = price_history[s.cusip]
+  const volumes = volume_history[s.cusip]
+  
+  if (prices && prices.length >= ma_period) {
+    const ma_prices = prices.slice(0, ma_period)
+    const moving_avg = ma_prices.reduce((sum, p) => sum + p, 0) / ma_period
+    const current_price = prices[0]
+    const price_ratio = current_price / moving_avg
+    
+    const recent_volume = volumes.slice(0, 5).reduce((sum, v) => sum + v, 0) / 5
+    const avg_volume = volumes.reduce((sum, v) => sum + v, 0) / volumes.length
+    const volume_ratio = recent_volume / avg_volume
+    
+    if (price_ratio >= breakout_threshold && volume_ratio >= min_volume_ratio) {
+      breakout_candidates.push({
+        ...s,
+        moving_avg,
+        price_ratio,
+        volume_ratio,
+        momentum_score: (price_ratio - 1) * 100 * volume_ratio
+      })
+    }
+  }
+})
+
+ranked_breakouts = breakout_candidates.sort((a, b) => b.momentum_score - a.momentum_score)
+__result__ = 'Found ' + ranked_breakouts.length + ' breakout candidates'`, 'ranking', 'Identify Breakouts'),
+        
+        createCell(3, `if (ranked_breakouts.length > 0) {
+  top_breakout = ranked_breakouts[0]
+  buy_signal = {
+    cusip: top_breakout.cusip,
+    name: top_breakout.name,
+    action: 'buy',
+    price: top_breakout.price,
+    reason: 'MOMENTUM_BREAKOUT',
+    momentum_score: top_breakout.momentum_score.toFixed(2),
+    price_vs_ma: ((top_breakout.price_ratio - 1) * 100).toFixed(2) + '%',
+    volume_surge: (top_breakout.volume_ratio).toFixed(2) + 'x'
+  }
+  __result__ = 'BUY ' + buy_signal.name + ' | Score: ' + buy_signal.momentum_score + ' | Above MA: ' + buy_signal.price_vs_ma
+} else {
+  __result__ = 'No breakout opportunities found'
+}`, 'trade', 'Generate Buy Signal')
+      ],
+      parameters: [
+        { id: 'p1', name: 'ma_period', value: 20, type: 'number', description: 'Moving average period' },
+        { id: 'p2', name: 'breakout_threshold', value: 1.02, type: 'number', description: 'Price above MA threshold' },
+        { id: 'p3', name: 'min_volume_ratio', value: 1.5, type: 'number', description: 'Volume surge multiplier' }
+      ]
+    }
+  },
+  
+  {
+    id: 'pairs-trading-cointegration',
+    name: 'Pairs Trading with Cointegration',
+    description: 'Statistical arbitrage strategy trading mean-reverting spread between cointegrated security pairs',
+    category: 'Trading',
+    strategy: {
+      name: 'Pairs Trading with Cointegration',
+      description: 'Statistical arbitrage strategy trading mean-reverting spread between cointegrated security pairs',
+      cells: [
+        createCell(0, `pair_A = 'SECURITY_A'
+pair_B = 'SECURITY_B'
+lookback = 90
+entry_z = 2.0
+exit_z = 0.5
+hedge_ratio = 1.0`, 'general', 'Pair Configuration'),
+        
+        createCell(1, `price_A = PRICE(pair_A)
+price_B = PRICE(pair_B)
+history_A = PRICE_HISTORY(pair_A, lookback)
+history_B = PRICE_HISTORY(pair_B, lookback)
+
+__result__ = 'Pair prices: ' + pair_A + '=$' + price_A + ' | ' + pair_B + '=$' + price_B`, 'data', 'Fetch Pair Data'),
+        
+        createCell(2, `spread_series = []
+for (let i = 0; i < Math.min(history_A.length, history_B.length); i++) {
+  spread_series.push(history_A[i] - (hedge_ratio * history_B[i]))
+}
+
+spread_mean = spread_series.reduce((sum, s) => sum + s, 0) / spread_series.length
+spread_variance = spread_series.reduce((sum, s) => sum + Math.pow(s - spread_mean, 2), 0) / spread_series.length
+spread_std = Math.sqrt(spread_variance)
+
+current_spread = price_A - (hedge_ratio * price_B)
+z_spread = (current_spread - spread_mean) / spread_std
+
+__result__ = 'Spread Z-Score: ' + z_spread.toFixed(2) + ' | Mean: ' + spread_mean.toFixed(2) + ' | StdDev: ' + spread_std.toFixed(2)`, 'calculation', 'Calculate Spread Statistics'),
+        
+        createCell(3, `current_position = GET_POSITION('pair_trade')
+trade_signal = null
+
+if (!current_position) {
+  if (z_spread > entry_z) {
+    trade_signal = {
+      action: 'short_spread',
+      long: pair_B,
+      short: pair_A,
+      hedge_ratio,
+      reason: 'SPREAD_OVERVALUED',
+      z_score: z_spread
+    }
+  } else if (z_spread < -entry_z) {
+    trade_signal = {
+      action: 'long_spread',
+      long: pair_A,
+      short: pair_B,
+      hedge_ratio,
+      reason: 'SPREAD_UNDERVALUED',
+      z_score: z_spread
+    }
+  }
+} else {
+  if (current_position.action === 'long_spread' && z_spread > -exit_z) {
+    trade_signal = { action: 'close', reason: 'SPREAD_MEAN_REVERT', z_score: z_spread }
+  } else if (current_position.action === 'short_spread' && z_spread < exit_z) {
+    trade_signal = { action: 'close', reason: 'SPREAD_MEAN_REVERT', z_score: z_spread }
+  }
+}
+
+__result__ = trade_signal ? 'Signal: ' + trade_signal.action + ' | Reason: ' + trade_signal.reason : 'No trade signal - holding position'`, 'trade', 'Generate Pair Trade Signal')
+      ],
+      parameters: [
+        { id: 'p1', name: 'lookback', value: 90, type: 'number', description: 'Historical lookback period' },
+        { id: 'p2', name: 'entry_z', value: 2.0, type: 'number', description: 'Z-score entry threshold' },
+        { id: 'p3', name: 'exit_z', value: 0.5, type: 'number', description: 'Z-score exit threshold' },
+        { id: 'p4', name: 'hedge_ratio', value: 1.0, type: 'number', description: 'Hedge ratio for pair' }
+      ]
+    }
+  },
+  
+  {
+    id: 'multi-asset-rebalance',
+    name: 'Multi-Asset Portfolio Rebalancing',
+    description: 'Dynamically rebalance portfolio across multiple asset classes based on target allocations and drift thresholds',
+    category: 'Trading',
+    strategy: {
+      name: 'Multi-Asset Portfolio Rebalancing',
+      description: 'Dynamically rebalance portfolio across multiple asset classes based on target allocations and drift thresholds',
+      cells: [
+        createCell(0, `target_allocations = {
+  'equity': 0.60,
+  'fixed_income': 0.30,
+  'alternatives': 0.10
+}
+drift_threshold = 0.05
+rebalance_frequency_days = 90
+total_portfolio_value = 10000000`, 'general', 'Portfolio Configuration'),
+        
+        createCell(1, `asset_positions = GET_ALL_POSITIONS()
+current_values = {}
+total_value = 0
+
+Object.keys(target_allocations).forEach(asset_class => {
+  const positions = asset_positions.filter(p => p.asset_class === asset_class)
+  const value = positions.reduce((sum, p) => sum + (p.shares * p.current_price), 0)
+  current_values[asset_class] = value
+  total_value += value
+})
+
+current_allocations = {}
+Object.keys(current_values).forEach(asset_class => {
+  current_allocations[asset_class] = current_values[asset_class] / total_value
+})
+
+__result__ = 'Total Portfolio: $' + total_value.toLocaleString() + ' | Assets: ' + Object.keys(current_allocations).length`, 'portfolio', 'Calculate Current Allocations'),
+        
+        createCell(2, `allocation_drift = {}
+needs_rebalance = false
+
+Object.keys(target_allocations).forEach(asset_class => {
+  const target = target_allocations[asset_class]
+  const current = current_allocations[asset_class] || 0
+  const drift = Math.abs(current - target)
+  allocation_drift[asset_class] = {
+    target: (target * 100).toFixed(1) + '%',
+    current: (current * 100).toFixed(1) + '%',
+    drift: (drift * 100).toFixed(1) + '%',
+    breached: drift > drift_threshold
+  }
+  if (drift > drift_threshold) needs_rebalance = true
+})
+
+__result__ = needs_rebalance 
+  ? 'REBALANCE REQUIRED - ' + Object.values(allocation_drift).filter(d => d.breached).length + ' asset classes breached'
+  : 'Portfolio within tolerance - no rebalance needed'`, 'risk', 'Check Drift Thresholds'),
+        
+        createCell(3, `if (needs_rebalance) {
+  rebalance_trades = []
+  
+  Object.keys(target_allocations).forEach(asset_class => {
+    const target_value = target_allocations[asset_class] * total_value
+    const current_value = current_values[asset_class] || 0
+    const delta_value = target_value - current_value
+    const delta_pct = (delta_value / total_value * 100).toFixed(2)
+    
+    if (Math.abs(delta_value) > (total_value * 0.01)) {
+      rebalance_trades.push({
+        asset_class,
+        action: delta_value > 0 ? 'buy' : 'sell',
+        amount: Math.abs(delta_value),
+        amount_pct: Math.abs(delta_pct) + '%',
+        reason: 'REBALANCE_TO_TARGET',
+        target: allocation_drift[asset_class].target,
+        current: allocation_drift[asset_class].current
+      })
+    }
+  })
+  
+  __result__ = 'Generated ' + rebalance_trades.length + ' rebalancing trades | Total adjustment: $' + 
+    rebalance_trades.reduce((sum, t) => sum + t.amount, 0).toLocaleString()
+} else {
+  __result__ = 'No rebalancing required'
+}`, 'trade', 'Generate Rebalance Orders')
+      ],
+      parameters: [
+        { id: 'p1', name: 'drift_threshold', value: 0.05, type: 'number', description: 'Max allocation drift (decimal)' },
+        { id: 'p2', name: 'rebalance_frequency_days', value: 90, type: 'number', description: 'Rebalance check frequency' }
+      ]
+    }
+  },
+  
+  {
     id: 'high-yield-credit-rotation',
     name: 'High-Yield Credit Rotation Strategy',
     description: 'Advanced multi-stage strategy that rotates between high-yield bonds based on credit trends, yield spreads, and sector momentum with iterative optimization',

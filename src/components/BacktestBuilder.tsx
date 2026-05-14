@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { PlayCircle, TrendUp, TrendDown, Equals, Upload, ChartLine, Table as TableIcon } from '@phosphor-icons/react'
 import { BacktestResult, BacktestConfig } from '@/lib/types'
 import { toast } from 'sonner'
+import { EquityCurveChart } from '@/components/EquityCurveChart'
 
 interface BacktestBuilderProps {
   onRun: (config: BacktestConfig, strategyCode: string, dataFiles: Record<string, any>) => Promise<BacktestResult>
@@ -245,6 +246,8 @@ return { action: 'hold' }
         <TabsContent value="results" className="space-y-4">
           {result ? (
             <>
+              <EquityCurveChart data={result.equity} startCapital={config.startCapital} />
+
               <div className="grid grid-cols-4 gap-4">
                 <Card>
                   <CardHeader className="pb-3">
