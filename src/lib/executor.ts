@@ -1,12 +1,52 @@
-import { CodeCell, ExecutionContext, Parameter, Security } from './types'
+import { CodeCell, ExecutionContext, Parameter, RunTraceEntry, Security } from './types'
 import { mockSecurities } from './mockData'
 import { ErrorAnalyzer, formatSmartError } from './errorAnalyzer'
+
+export interface LoopGuardViolation {
+  cellIndex: number
+  message: string
+}
+
+export function validateLoopGuards(cells: CodeCell[]): LoopGuardViolation[] {
+  const violations: LoopGuardViolation[] = []
+
+  cells.forEach((cell) => {
+    // Detect explicit goto-based backward jumps
+    if (
+      cell.controlFlow &&
+      cell.controlFlow.type === 'goto' &&
+      cell.controlFlow.target != null &&
+      cell.controlFlow.target <= cell.index
+    ) {
+      violations.push({
+        cellIndex: cell.index,
+        message: `Cell [${cell.index}] jumps backward to cell [${cell.controlFlow.target}] but has no loop guards. Add maxIterations and an exitCondition via the Transition Editor.`
+      })
+    }
+
+    // Detect inline loop DSL in code (loop from … to …)
+    if (cell.code && /\bloop\s+from\b/i.test(cell.code)) {
+      const hasMax = /max_iterations\s*:/i.test(cell.code)
+      const hasExit = /exit_when\s*:/i.test(cell.code)
+      if (!hasMax || !hasExit) {
+        violations.push({
+          cellIndex: cell.index,
+          message: `Cell [${cell.index}] declares a loop but is missing ${!hasMax ? 'max_iterations' : ''}${!hasMax && !hasExit ? ' and ' : ''}${!hasExit ? 'exit_when' : ''}. Loops must have both guards.`
+        })
+      }
+    }
+  })
+
+  return violations
+}
 
 export class StrategyExecutor {
   private context: ExecutionContext
   private cells: CodeCell[]
   private parameters: Parameter[]
   private securities: Security[]
+  private runTrace: RunTraceEntry[] = []
+  private prevRowCounts: Map<number, number> = new Map()
 
   constructor(cells: CodeCell[], parameters: Parameter[], securities: Security[] = mockSecurities) {
     this.cells = cells
@@ -21,6 +61,10 @@ export class StrategyExecutor {
     
     this.initializeParameters()
     this.initializeMarketDataFunctions()
+  }
+
+  public getRunTrace(): RunTraceEntry[] {
+    return [...this.runTrace]
   }
 
   private initializeParameters() {
@@ -116,11 +160,52 @@ export class StrategyExecutor {
 
       const executionTime = performance.now() - startTime
 
+      // Compute row-count delta and sample output
+      let rowCountDelta: number | undefined
+      let sampleOutput: string | undefined
+
+      if (result != null) {
+        if (Array.isArray(result)) {
+          const prevLen = this.prevRowCounts.get(cellIndex) ?? 0
+          rowCountDelta = result.length - prevLen
+          this.prevRowCounts.set(cellIndex, result.length)
+          sampleOutput = JSON.stringify(result.slice(0, 3), null, 2)
+        } else if (typeof result === 'object' && result !== null && 'data' in result && Array.isArray((result as any).data)) {
+          const df = result as any
+          const prevLen = this.prevRowCounts.get(cellIndex) ?? 0
+          rowCountDelta = df.data.length - prevLen
+          this.prevRowCounts.set(cellIndex, df.data.length)
+          sampleOutput = JSON.stringify(df.data.slice(0, 3), null, 2)
+        }
+      }
+
+      // Record trace entry
+      const reasonCode = controlFlow && controlFlow.type !== 'none'
+        ? controlFlow.type === 'goto'
+          ? `GOTO_${controlFlow.target}`
+          : controlFlow.type.toUpperCase()
+        : 'FALL_THROUGH'
+
+      this.runTrace.push({
+        cellIndex,
+        cellLabel: cell.label,
+        action: controlFlow?.type !== 'none' ? controlFlow?.type ?? 'next' : 'next',
+        condition: controlFlow?.condition,
+        result: result != null ? String(result).slice(0, 100) : undefined,
+        timestamp: Date.now(),
+        branchTaken: controlFlow?.type !== 'none' && controlFlow?.type
+          ? controlFlow.type === 'goto' ? `→ cell ${controlFlow.target}` : controlFlow.type
+          : 'next',
+        reasonCode
+      })
+
       return {
         ...cell,
         status: 'success',
         output: result != null ? String(result) : '',
         executionTime,
+        rowCountDelta,
+        sampleOutput,
         controlFlow: controlFlow.type !== 'none' ? controlFlow : undefined
       }
     } catch (error) {
@@ -129,6 +214,14 @@ export class StrategyExecutor {
       const errorAnalyzer = new ErrorAnalyzer(this.cells, this.context, cellIndex)
       const smartError = errorAnalyzer.analyzeError(error as Error)
       const formattedError = formatSmartError(smartError)
+
+      this.runTrace.push({
+        cellIndex,
+        cellLabel: cell.label,
+        action: 'error',
+        timestamp: Date.now(),
+        reasonCode: 'EXECUTION_ERROR'
+      })
       
       return {
         ...cell,
@@ -178,10 +271,32 @@ export class StrategyExecutor {
     return { code: modifiedCode, controlFlow }
   }
 
-  public async executeAll(): Promise<CodeCell[]> {
+  public async executeAll(): Promise<{ cells: CodeCell[]; runTrace: RunTraceEntry[] }> {
+    // Enforce loop guards before any cell runs
+    const violations = validateLoopGuards(this.cells)
+    if (violations.length > 0) {
+      const errorMsg = violations.map(v => v.message).join('\n')
+      const errorCells = this.cells.map((cell, idx) => {
+        const v = violations.find(x => x.cellIndex === idx)
+        if (v) {
+          return { ...cell, status: 'error' as const, error: v.message }
+        }
+        return { ...cell, status: 'skipped' as const }
+      })
+      this.runTrace.push({
+        cellIndex: -1,
+        action: 'error',
+        result: errorMsg,
+        timestamp: Date.now(),
+        reasonCode: 'LOOP_GUARD_VIOLATION'
+      })
+      return { cells: errorCells, runTrace: this.getRunTrace() }
+    }
+
     const results: CodeCell[] = [...this.cells]
     let currentIndex = 0
     this.context.iterationCount = 0
+    this.runTrace = []
 
     while (currentIndex < this.cells.length && this.context.iterationCount < this.context.maxIterations) {
       this.context.iterationCount++
@@ -208,9 +323,15 @@ export class StrategyExecutor {
         status: 'error',
         error: 'Maximum iteration limit reached (possible infinite loop)'
       }
+      this.runTrace.push({
+        cellIndex: currentIndex,
+        action: 'error',
+        timestamp: Date.now(),
+        reasonCode: 'MAX_ITERATIONS_EXCEEDED'
+      })
     }
 
-    return results
+    return { cells: results, runTrace: this.getRunTrace() }
   }
 
   public getContext(): ExecutionContext {

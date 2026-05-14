@@ -1,107 +1,134 @@
-import { Strategy, ExecutionTrace, BacktestResult } from './types'
+/**
+ * External private persistence layer.
+ *
+ * Stores strategy definitions, run logs, and artifacts in the browser's
+ * localStorage — outside Spark's default shared KV store — so that each
+ * user's data remains private to their browser session.
+ */
 
-const STORAGE_PREFIX = '_private_strategy_'
-const TRACE_PREFIX = '_private_trace_'
-const BACKTEST_PREFIX = '_private_backtest_'
+const PREFIX = 'ssb:private:'
+const KEY_STRATEGY = `${PREFIX}strategy`
+const KEY_RUN_LOG_INDEX = `${PREFIX}run-log-index`
+const KEY_ARTIFACT_INDEX = `${PREFIX}artifact-index`
 
-export class PrivatePersistence {
-  private getUserPrefix(): string {
-    return STORAGE_PREFIX
-  }
+// ─── Strategy ────────────────────────────────────────────────────────────────
 
-  async saveStrategy(strategy: Strategy): Promise<void> {
-    const key = `${this.getUserPrefix()}${strategy.id}`
-    await window.spark.kv.set(key, strategy)
-  }
-
-  async loadStrategy(strategyId: string): Promise<Strategy | undefined> {
-    const key = `${this.getUserPrefix()}${strategyId}`
-    return await window.spark.kv.get<Strategy>(key)
-  }
-
-  async listStrategies(): Promise<Strategy[]> {
-    const keys = await window.spark.kv.keys()
-    const prefix = this.getUserPrefix()
-    const strategyKeys = keys.filter((k: string) => k.startsWith(prefix))
-    
-    const strategies: Strategy[] = []
-    for (const key of strategyKeys) {
-      const strategy = await window.spark.kv.get<Strategy>(key)
-      if (strategy) {
-        strategies.push(strategy)
-      }
-    }
-    
-    return strategies.sort((a, b) => b.updatedAt - a.updatedAt)
-  }
-
-  async deleteStrategy(strategyId: string): Promise<void> {
-    const key = `${this.getUserPrefix()}${strategyId}`
-    await window.spark.kv.delete(key)
-  }
-
-  async saveExecutionTrace(strategyId: string, trace: ExecutionTrace): Promise<void> {
-    const key = `${TRACE_PREFIX}${strategyId}_${Date.now()}`
-    await window.spark.kv.set(key, trace)
-  }
-
-  async getExecutionTraces(strategyId: string, limit: number = 10): Promise<ExecutionTrace[]> {
-    const keys = await window.spark.kv.keys()
-    const prefix = `${TRACE_PREFIX}${strategyId}_`
-    const traceKeys = keys
-      .filter((k: string) => k.startsWith(prefix))
-      .sort()
-      .reverse()
-      .slice(0, limit)
-    
-    const traces: ExecutionTrace[] = []
-    for (const key of traceKeys) {
-      const trace = await window.spark.kv.get<ExecutionTrace>(key)
-      if (trace) {
-        traces.push(trace)
-      }
-    }
-    
-    return traces
-  }
-
-  async saveBacktestResult(strategyId: string, result: BacktestResult): Promise<void> {
-    const key = `${BACKTEST_PREFIX}${strategyId}_${Date.now()}`
-    await window.spark.kv.set(key, result)
-  }
-
-  async getBacktestResults(strategyId: string, limit: number = 5): Promise<BacktestResult[]> {
-    const keys = await window.spark.kv.keys()
-    const prefix = `${BACKTEST_PREFIX}${strategyId}_`
-    const backtestKeys = keys
-      .filter((k: string) => k.startsWith(prefix))
-      .sort()
-      .reverse()
-      .slice(0, limit)
-    
-    const results: BacktestResult[] = []
-    for (const key of backtestKeys) {
-      const result = await window.spark.kv.get<BacktestResult>(key)
-      if (result) {
-        results.push(result)
-      }
-    }
-    
-    return results
-  }
-
-  async clearAllPrivateData(): Promise<void> {
-    const keys = await window.spark.kv.keys()
-    const privateKeys = keys.filter((k: string) => 
-      k.startsWith(STORAGE_PREFIX) || 
-      k.startsWith(TRACE_PREFIX) || 
-      k.startsWith(BACKTEST_PREFIX)
-    )
-    
-    for (const key of privateKeys) {
-      await window.spark.kv.delete(key)
-    }
+export function saveStrategyExternal(strategy: unknown): void {
+  try {
+    localStorage.setItem(KEY_STRATEGY, JSON.stringify(strategy))
+  } catch {
+    // localStorage may be unavailable in some environments; fail silently
   }
 }
 
-export const privatePersistence = new PrivatePersistence()
+export function loadStrategyExternal(): unknown | null {
+  try {
+    const raw = localStorage.getItem(KEY_STRATEGY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+// ─── Run logs ─────────────────────────────────────────────────────────────────
+
+function runLogKey(runId: string): string {
+  return `${PREFIX}run-log:${runId}`
+}
+
+function runLogIndex(): string[] {
+  try {
+    const raw = localStorage.getItem(KEY_RUN_LOG_INDEX)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveRunLog(runId: string, log: unknown): void {
+  try {
+    localStorage.setItem(runLogKey(runId), JSON.stringify(log))
+    const index = runLogIndex()
+    if (!index.includes(runId)) {
+      index.push(runId)
+      localStorage.setItem(KEY_RUN_LOG_INDEX, JSON.stringify(index))
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function loadRunLog(runId: string): unknown | null {
+  try {
+    const raw = localStorage.getItem(runLogKey(runId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+export function listRunLogs(): string[] {
+  return runLogIndex()
+}
+
+export function deleteRunLog(runId: string): void {
+  try {
+    localStorage.removeItem(runLogKey(runId))
+    const index = runLogIndex().filter(id => id !== runId)
+    localStorage.setItem(KEY_RUN_LOG_INDEX, JSON.stringify(index))
+  } catch {
+    // ignore
+  }
+}
+
+// ─── Artifacts ────────────────────────────────────────────────────────────────
+
+function artifactKey(name: string): string {
+  return `${PREFIX}artifact:${name}`
+}
+
+function artifactIndex(): string[] {
+  try {
+    const raw = localStorage.getItem(KEY_ARTIFACT_INDEX)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveArtifact(name: string, data: string): void {
+  try {
+    localStorage.setItem(artifactKey(name), data)
+    const index = artifactIndex()
+    if (!index.includes(name)) {
+      index.push(name)
+      localStorage.setItem(KEY_ARTIFACT_INDEX, JSON.stringify(index))
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function loadArtifact(name: string): string | null {
+  try {
+    return localStorage.getItem(artifactKey(name))
+  } catch {
+    return null
+  }
+}
+
+export function listArtifacts(): string[] {
+  return artifactIndex()
+}
+
+// ─── File download helper ─────────────────────────────────────────────────────
+
+export function downloadJSON(data: unknown, filename: string): void {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}

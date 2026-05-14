@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CodeCell, Parameter, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate, BacktestConfig, BacktestResult } from '@/lib/types'
+import { CodeCell, Parameter, RunTraceEntry, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate, BacktestConfig, BacktestResult } from '@/lib/types'
 import { CodeCellComponent } from '@/components/CodeCellComponent'
 import { ParameterPanel } from '@/components/ParameterPanel'
 import { ContextInspector } from '@/components/ContextInspector'
@@ -22,13 +22,15 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { FloppyDisk, Code, Plus, PlayCircle, FlowArrow, Database, Calculator, SidebarSimple, ChartLine } from '@phosphor-icons/react'
+import { Badge } from '@/components/ui/badge'
+import { FloppyDisk, Code, Plus, PlayCircle, FlowArrow, Database, Calculator, SidebarSimple, ChartLine, DownloadSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { BacktestEngine } from '@/lib/backtestEngine'
 import { DataFrame, readJSON, toDatetime, toNumeric } from '@/lib/dataFrame'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { cn } from '@/lib/utils'
+import { saveStrategyExternal, loadStrategyExternal, saveRunLog, downloadJSON } from '@/lib/persistence'
 
 const createDefaultCell = (index: number, code: string = ''): CodeCell => ({
   id: `cell-${index}`,
@@ -53,6 +55,7 @@ const createDefaultStrategy = (): Strategy => ({
 function App() {
   const [strategy, setStrategy] = useKV<Strategy>('current-strategy', createDefaultStrategy())
   const [currentUser, setCurrentUser] = useState<{ login: string; avatarUrl: string } | undefined>(undefined)
+  const [runTrace, setRunTrace] = useState<RunTraceEntry[]>([])
 
   const [executionContext, setExecutionContext] = useState<ExecutionContext>({
     variables: {},
@@ -172,6 +175,35 @@ function App() {
     })
   }
 
+  const handleDuplicateCell = (index: number) => {
+    setStrategy((current) => {
+      if (!current || !Array.isArray(current.cells)) {
+        return createDefaultStrategy()
+      }
+      const source = current.cells[index]
+      const newCells = [...current.cells]
+      // Insert duplicate immediately after the source cell
+      const duplicate: CodeCell = {
+        ...source,
+        status: 'idle',
+        output: '',
+        error: undefined,
+        executionTime: undefined,
+        rowCountDelta: undefined,
+        sampleOutput: undefined,
+        label: source.label ? `${source.label} (copy)` : undefined
+      }
+      newCells.splice(index + 1, 0, duplicate)
+      const reindexedCells = newCells.map((cell, i) => ({ ...cell, index: i, id: `cell-${i}` }))
+      return {
+        ...current,
+        cells: reindexedCells,
+        updatedAt: Date.now()
+      }
+    })
+    toast.info('Cell duplicated')
+  }
+
   const handleAddCell = () => {
     setStrategy((current) => {
       if (!current || !Array.isArray(current.cells)) {
@@ -234,7 +266,18 @@ function App() {
       }
     })
 
-    const results = await executor.executeAll()
+    const { cells: results, runTrace: trace } = await executor.executeAll()
+    
+    setRunTrace(trace)
+
+    const runId = `run-${Date.now()}`
+    saveRunLog(runId, {
+      strategyId: strategy.id,
+      strategyName: strategy.name,
+      runId,
+      timestamp: Date.now(),
+      trace
+    })
     
     setStrategy((current) => {
       const defaultStrategy = createDefaultStrategy()
@@ -249,7 +292,12 @@ function App() {
     })
 
     setExecutionContext(executor.getContext())
-    toast.success('Execution complete')
+    const errors = results.filter(c => c.status === 'error')
+    if (errors.length > 0) {
+      toast.error(`Execution finished with ${errors.length} error(s)`)
+    } else {
+      toast.success('Execution complete')
+    }
   }
 
   const handleParametersChange = (parameters: Parameter[]) => {
@@ -283,7 +331,22 @@ function App() {
   }
 
   const handleSaveStrategy = () => {
-    toast.success('Strategy saved successfully')
+    // Persist strategy to external private store (localStorage) in addition to Spark KV
+    saveStrategyExternal(strategy)
+    toast.success('Strategy saved to private storage')
+  }
+
+  const handleExportRunTrace = () => {
+    if (runTrace.length === 0) {
+      toast.info('No run trace available. Run the strategy first.')
+      return
+    }
+    downloadJSON({
+      strategyName: safeStrategy.name,
+      exportedAt: new Date().toISOString(),
+      trace: runTrace
+    }, `run-trace-${Date.now()}.json`)
+    toast.success('Run trace exported')
   }
 
   useEffect(() => {
@@ -579,6 +642,21 @@ function App() {
                 <PlayCircle size={16} className="mr-2" weight="fill" />
                 <span className="hidden sm:inline">Run All</span>
               </Button>
+              <Button
+                onClick={handleExportRunTrace}
+                size="sm"
+                variant="outline"
+                title="Export run trace"
+                className={cn(runTrace.length > 0 && 'border-accent text-accent')}
+              >
+                <DownloadSimple size={16} className="mr-1" />
+                <span className="hidden sm:inline">Trace</span>
+                {runTrace.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                    {runTrace.length}
+                  </Badge>
+                )}
+              </Button>
               <Button onClick={handleSaveStrategy} size="sm" variant="secondary">
                 <FloppyDisk size={16} className="mr-2" />
                 <span className="hidden sm:inline">Save</span>
@@ -643,6 +721,7 @@ function App() {
                                           onCellChange={(updates) => handleCellChange(cell.index, updates)}
                                           onRun={() => handleRunCell(cell.index)}
                                           onDelete={() => handleDeleteCell(cell.index)}
+                                          onDuplicate={() => handleDuplicateCell(cell.index)}
                                           comments={cellComments}
                                           onAddComment={handleAddComment}
                                           onDeleteComment={handleDeleteComment}

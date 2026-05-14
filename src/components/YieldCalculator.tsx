@@ -6,8 +6,73 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Calculator, Info } from '@phosphor-icons/react'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Calculator, Info, CheckCircle, XCircle, FlaskConical } from '@phosphor-icons/react'
+import { cn } from '@/lib/utils'
+
+// ── Reference fixtures ────────────────────────────────────────────────────────
+// Each fixture defines a known bond scenario and its expected yield values.
+// These values are validated against the generated formula logic to surface
+// assumption mismatches early.
+const FIXTURES = [
+  {
+    id: 'ust-5y',
+    label: '5% UST 5Y @ par',
+    coupon: 0.05,
+    faceValue: 1000,
+    price: 1000,        // at par
+    frequency: 'semiannual' as const,
+    maturityYears: 5,
+    expectedCurrentYield: 0.05,    // 5%
+    expectedYTM: 0.05,             // 5% (at par, YTM = coupon)
+    expectedYTW: 0.05,
+    tolerance: 0.0001
+  },
+  {
+    id: 'discount-bond',
+    label: '6% 10Y @ 90 (discount)',
+    coupon: 0.06,
+    faceValue: 1000,
+    price: 900,          // below par
+    frequency: 'semiannual' as const,
+    maturityYears: 10,
+    expectedCurrentYield: 0.0667,  // 60/900
+    expectedYTM: 0.0729,           // approx
+    expectedYTW: 0.0729,
+    tolerance: 0.005
+  },
+  {
+    id: 'premium-bond',
+    label: '8% 10Y @ 110 (premium)',
+    coupon: 0.08,
+    faceValue: 1000,
+    price: 1100,         // above par
+    frequency: 'semiannual' as const,
+    maturityYears: 10,
+    expectedCurrentYield: 0.0727,  // 80/1100
+    expectedYTM: 0.0659,           // approx
+    expectedYTW: 0.0659,
+    tolerance: 0.005
+  }
+]
+
+function calcCurrentYield(coupon: number, faceValue: number, price: number): number {
+  return (coupon * faceValue) / price
+}
+
+function calcYTMApprox(coupon: number, faceValue: number, price: number, years: number): number {
+  // Approximation: (coupon + (face - price) / years) / ((face + price) / 2)
+  const annualCoupon = coupon * faceValue
+  return (annualCoupon + (faceValue - price) / years) / ((faceValue + price) / 2)
+}
+
+interface FixtureResult {
+  id: string
+  label: string
+  method: string
+  expected: number
+  calculated: number
+  pass: boolean
+}
 
 interface YieldCalculatorProps {
   onGenerateFormula?: (formula: string) => void
@@ -19,6 +84,7 @@ export function YieldCalculator({ onGenerateFormula }: YieldCalculatorProps) {
   const [faceValue, setFaceValue] = useState('1000')
   const [frequency, setFrequency] = useState<'annual' | 'semiannual' | 'quarterly'>('semiannual')
   const [dayCount, setDayCount] = useState<'30/360' | 'actual/365' | 'actual/actual'>('30/360')
+  const [fixtureResults, setFixtureResults] = useState<FixtureResult[] | null>(null)
 
   const generateFormula = () => {
     let formula = ''
@@ -97,6 +163,37 @@ __result__ = custom_yield`
   const handleGenerate = () => {
     const formula = generateFormula()
     onGenerateFormula?.(formula)
+  }
+
+  const runFixtures = () => {
+    const results: FixtureResult[] = []
+    FIXTURES.forEach(f => {
+      if (yieldMethod === 'current' || yieldMethod === 'ytw') {
+        const calc = calcCurrentYield(f.coupon, f.faceValue, f.price)
+        const expected = f.expectedCurrentYield
+        results.push({
+          id: f.id,
+          label: f.label,
+          method: 'Current Yield',
+          expected,
+          calculated: calc,
+          pass: Math.abs(calc - expected) <= f.tolerance
+        })
+      }
+      if (yieldMethod === 'ytm' || yieldMethod === 'ytw') {
+        const calc = calcYTMApprox(f.coupon, f.faceValue, f.price, f.maturityYears)
+        const expected = f.expectedYTM
+        results.push({
+          id: f.id + '-ytm',
+          label: f.label,
+          method: 'YTM (approx)',
+          expected,
+          calculated: calc,
+          pass: Math.abs(calc - expected) <= f.tolerance
+        })
+      }
+    })
+    setFixtureResults(results)
   }
 
   const getYieldDescription = () => {
@@ -212,6 +309,10 @@ __result__ = custom_yield`
           </div>
           <div className="p-3 bg-muted/30 rounded-md text-xs space-y-1 font-mono">
             <div className="flex justify-between">
+              <span className="text-muted-foreground">Method:</span>
+              <span className="uppercase">{yieldMethod}</span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Price:</span>
               <span>{priceType === 'clean' ? 'Clean' : 'Dirty'}</span>
             </div>
@@ -233,6 +334,57 @@ __result__ = custom_yield`
             )}
           </div>
         </div>
+
+        {yieldMethod !== 'custom' && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm flex items-center gap-1">
+                  <FlaskConical size={14} />
+                  Fixture Validation
+                </Label>
+                <Button size="sm" variant="outline" onClick={runFixtures} className="h-7 text-xs">
+                  Run Tests
+                </Button>
+              </div>
+              {fixtureResults ? (
+                <div className="space-y-1">
+                  {fixtureResults.map(r => (
+                    <div
+                      key={r.id}
+                      className={cn(
+                        'flex items-center justify-between rounded p-1.5 text-xs border',
+                        r.pass ? 'bg-success/5 border-success/20' : 'bg-destructive/5 border-destructive/20'
+                      )}
+                    >
+                      <div className="flex items-center gap-1 min-w-0">
+                        {r.pass
+                          ? <CheckCircle size={12} className="text-success shrink-0" weight="fill" />
+                          : <XCircle size={12} className="text-destructive shrink-0" weight="fill" />
+                        }
+                        <span className="truncate">{r.label} · {r.method}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-2 font-mono">
+                        <span className="text-muted-foreground">{(r.expected * 100).toFixed(3)}%</span>
+                        <span className={r.pass ? 'text-success' : 'text-destructive'}>
+                          {(r.calculated * 100).toFixed(3)}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-muted-foreground pt-1">
+                    Left = expected · Right = calculated. Tolerance is fixture-specific (0.01% for par, 0.5% for discount/premium).
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Run tests to validate your assumptions against reference fixtures.
+                </p>
+              )}
+            </div>
+          </>
+        )}
 
         <Button onClick={handleGenerate} className="w-full" size="sm">
           <Calculator size={16} className="mr-2" />

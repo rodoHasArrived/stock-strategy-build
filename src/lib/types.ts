@@ -93,6 +93,9 @@ export interface CodeCell {
   mode: CellMode
   purpose: CellPurpose
   label?: string
+  collapsed?: boolean
+  rowCountDelta?: number
+  sampleOutput?: string
   contract?: CellContract
   validationResult?: ValidationResult
   controlFlow?: {
@@ -169,9 +172,10 @@ export interface StrategyTemplate {
 export interface TransitionRule {
   id: string
   condition?: string
-  action: 'next' | 'goto' | 'stop' | 'loop' | 'while'
+  action: 'next' | 'goto' | 'stop' | 'loop' | 'while' | 'pass' | 'fail' | 'missing_data' | 'error'
   target?: number
   label?: string
+  backwardJumpJustification?: string
   loopConfig?: {
     startCell: number
     endCell: number
@@ -179,6 +183,17 @@ export interface TransitionRule {
     exitCondition?: string
   }
   backwardJumpJustification?: string
+}
+
+export interface RunTraceEntry {
+  cellIndex: number
+  cellLabel?: string
+  action: string
+  condition?: string
+  result?: string
+  timestamp: number
+  branchTaken?: string
+  reasonCode?: string
 }
 
 export interface ExecutionPath {
