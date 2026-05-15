@@ -7,7 +7,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon, ChatCircle, NoteBlank, DotsSixVertical, Article, CopySimple, CaretDown, CaretRight, Table } from '@phosphor-icons/react'
 import { VisualBuilder } from '@/components/VisualBuilder'
 import { DataFieldSelector } from '@/components/DataFieldSelector'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { CellComments } from '@/components/CellComments'
 import { Input } from '@/components/ui/input'
@@ -459,8 +458,8 @@ export function CodeCellComponent({
               </div>
 
               <TabsContent value="visual" className="space-y-3 mt-3">
-                <ScrollArea className="max-h-[400px]">
-                  <div className="space-y-4 pr-3">
+                <div className="max-h-[420px] overflow-y-auto rounded-md border bg-background/40">
+                  <div className="space-y-4 p-3">
                     <VisualBuilder
                       conditions={cell.visualConfig?.conditions || []}
                       onConditionsChange={handleConditionsChange}
@@ -484,7 +483,7 @@ export function CodeCellComponent({
                       />
                     </div>
                   </div>
-                </ScrollArea>
+                </div>
               </TabsContent>
 
               <TabsContent value="formula" className="mt-3">
