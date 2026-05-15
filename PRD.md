@@ -13,7 +13,7 @@ A comprehensive cell-based investment strategy builder that enables users to cre
 ## Essential Features
 
 ### Multi-Mode Cell Interface
-- **Functionality**: Each cell supports three modes - Visual Builder (drag-and-drop conditions and data field selectors), Formula Mode (Excel-like), and Advanced Code Mode (Python-style)
+- **Functionality**: Each cell supports three modes - Visual Builder (drag-and-drop conditions and data field selectors), Formula Mode (Excel-like), and Advanced Code Mode (VBA-style)
 - **Purpose**: Enable non-technical users to start with visual mode and progressively learn more advanced techniques as they grow
 - **Trigger**: User toggles mode selector tabs in cell header (Visual/Formula/Code buttons)
 - **Progression**: Select Visual mode → Drag condition blocks → Configure thresholds → Add data field selectors → Preview results → Switch to Formula mode to see generated expression → Switch to Code for full control → Live preview updates in all modes → Generated code syncs across modes
@@ -93,14 +93,14 @@ A comprehensive cell-based investment strategy builder that enables users to cre
 - **Functionality**: Context-aware formula suggestions that appear as user types variable assignments
 - **Purpose**: Accelerate formula writing and reduce errors by suggesting complete formulas based on variable context
 - **Trigger**: User types variable assignment followed by `=` in formula or code mode
-- **Progression**: Type "current_yield = " → System detects context → Autocomplete suggestions appear showing multiple formula options (annual_coupon / market_price, face_value * coupon_rate / clean_price, COUPON(cusip) / PRICE(cusip)) → User navigates with ↑↓ keys → Press Enter/Tab to insert suggestion → Formula auto-completes
+- **Progression**: Type "Let current_yield = " → System detects context → Autocomplete suggestions appear showing multiple formula options (annual_coupon / market_price, face_value * coupon_rate / clean_price, COUPON(cusip) / PRICE(cusip)) → User navigates with ↑↓ keys → Press Enter/Tab to insert suggestion → Formula auto-completes
 - **Success criteria**: Suggestions appear within 50ms of typing, arrow key navigation works smoothly, Enter/Tab inserts formula, Esc dismisses, suggestions contextually relevant to variable name, supports common patterns (yields, returns, spreads, durations)
 
 ### Python-Style Backtesting Engine
 - **Functionality**: Full-featured backtesting environment with pandas-like DataFrame operations, JSON data loading, rolling window calculations, comprehensive performance metrics (CAGR, Sharpe, Sortino, Calmar, MaxDD), equity curve visualization, and multi-asset portfolio rebalancing
-- **Purpose**: Enable quantitative traders to validate strategies using Python-style syntax with realistic slippage models, transaction costs, volume constraints, and visual equity curve analysis before live deployment
+- **Purpose**: Enable quantitative traders to validate strategies using VBA-style strategy syntax with realistic slippage models, transaction costs, volume constraints, and visual equity curve analysis before live deployment
 - **Trigger**: User clicks Backtest tab in main navigation
-- **Progression**: Upload JSON price/volume data for multiple assets → Configure backtest parameters (starting capital, transaction costs, volume cap %, slippage model, rebalance frequency) → Write Python-style strategy code using DataFrame API (merge, rolling, ffill, pctChange) → Define trading signals (buy/sell/hold with reasons) or portfolio allocation targets → Click Run Backtest → View interactive equity curve chart with drawdown overlay → Analyze performance metrics dashboard → Review trade-by-trade breakdown → Export results
+- **Progression**: Upload JSON price/volume data for multiple assets → Configure backtest parameters (starting capital, transaction costs, volume cap %, slippage model, rebalance frequency) → Write VBA-style strategy code using DataFrame API (merge, rolling, ffill, pctChange) → Define trading signals (buy/sell/hold with reasons) or portfolio allocation targets → Click Run Backtest → View interactive equity curve chart with drawdown overlay → Analyze performance metrics dashboard → Review trade-by-trade breakdown → Export results
 - **Success criteria**: Sub-second execution for 250+ day backtests, accurate implementation of adaptive slippage based on ADV, comprehensive metrics dashboard with visual feedback, interactive equity curve with zoom/pan, drawdown visualization showing peak-to-trough declines, trade-by-trade breakdown with execution prices, support for dividend reinvestment, realistic partial fill simulation based on volume caps, multi-asset portfolio rebalancing with drift tracking
 
 ### Equity Curve Visualization

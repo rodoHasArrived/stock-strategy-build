@@ -30,7 +30,7 @@ const MODE_META: Record<CellMode, { label: string; description: string }> = {
   },
   code: {
     label: 'Strategy code',
-    description: 'Use JavaScript plus basket and control-flow helpers'
+    description: 'Use VBA-style strategy steps with basket and control-flow helpers'
   }
 }
 
@@ -139,15 +139,15 @@ export function CodeCellComponent({
     onCellChange({ visualConfig })
     
     const conditionCode = conditions.map((c, i) => {
-      const logic = i > 0 && c.logic ? ` ${c.logic === 'AND' ? '&&' : '||'} ` : ''
-      const operator = c.operator === '=' ? '===' : c.operator
+      const logic = i > 0 && c.logic ? ` ${c.logic === 'AND' ? 'And' : 'Or'} ` : ''
+      const operator = c.operator === '=' ? '=' : c.operator
       const condition = c.operator === 'between'
-        ? `${c.field}(cusip) >= ${c.value} && ${c.field}(cusip) <= ${c.value2}`
+        ? `${c.field}(cusip) >= ${c.value} And ${c.field}(cusip) <= ${c.value2}`
         : `${c.field}(cusip) ${operator} ${typeof c.value === 'string' ? `"${c.value}"` : c.value}`
       return `${logic}${condition}`
     }).join('')
     
-    onCodeChange(`if (${conditionCode}) {\n  result("Match")\n}`)
+    onCodeChange(`If ${conditionCode} Then\n  Result = "Match"\nEnd If`)
   }
 
   const handleDataFieldsChange = (dataFields: string[]) => {
@@ -498,7 +498,7 @@ export function CodeCellComponent({
                      onChange={onCodeChange}
                      onRun={onRun}
                      onActivate={() => setActiveMode('formula')}
-                     placeholder="Enter formula... (e.g., current_yield = )"
+                     placeholder="Enter formula... (e.g., Let current_yield = )"
                      className="min-h-[80px] bg-muted/30"
                      id={`cell-formula-${cell.index}`}
                    />
@@ -512,10 +512,10 @@ export function CodeCellComponent({
                  <div className="space-y-2">
                    <div className="flex flex-col gap-2 rounded-md border bg-muted/30 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                       <Badge variant="outline">JavaScript</Badge>
-                       <Badge variant="outline">basket Name:</Badge>
-                       <Badge variant="outline">result(value)</Badge>
-                       <Badge variant="outline">goto(5)</Badge>
+                       <Badge variant="outline">VBA-style</Badge>
+                       <Badge variant="outline">Basket Name:</Badge>
+                       <Badge variant="outline">Result = value</Badge>
+                       <Badge variant="outline">GoTo 5</Badge>
                      </div>
                      <div className="text-xs text-muted-foreground">
                        Drag fields in or press Cmd/Ctrl+Enter to run
@@ -544,8 +544,8 @@ export function CodeCellComponent({
                      <Suspense fallback={<div role="status" aria-live="polite" className="flex h-[320px] items-center justify-center text-sm text-muted-foreground">Loading code editor…</div>}>
                        <MonacoEditor
                          height="320px"
-                        defaultLanguage="javascript"
-                        path={`${cell.id}.js`}
+                        defaultLanguage="vb"
+                        path={`${cell.id}.bas`}
                         value={cell.code}
                         onMount={handleCodeEditorMount}
                         onChange={(value) => onCodeChange(value ?? '')}

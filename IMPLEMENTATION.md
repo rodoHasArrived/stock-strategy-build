@@ -54,7 +54,7 @@ Context-aware formula suggestions that appear as users type variable assignments
 ```
 
 **Autocomplete Example:**
-- User types: `current_yield = `
+- User types: `Let current_yield = `
 - Suggestions appear:
   1. `annual_coupon / market_price` (yield calculation)
   2. `face_value * coupon_rate / clean_price` (yield from face value)

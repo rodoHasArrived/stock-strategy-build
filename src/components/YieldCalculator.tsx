@@ -91,69 +91,69 @@ export function YieldCalculator({ onGenerateFormula }: YieldCalculatorProps) {
     
     switch (yieldMethod) {
       case 'current':
-        formula = `# Current Yield Calculation
-# Annual coupon divided by current market price
-face_value = FACE_VALUE(cusip) or ${faceValue}
-coupon_rate = COUPON(cusip)
-market_price = ${priceType === 'clean' ? 'CLEAN_PRICE(cusip)' : 'DIRTY_PRICE(cusip)'}
+        formula = `' Current Yield Calculation
+' Annual coupon divided by current market price
+Let face_value = FACE_VALUE(cusip) Or ${faceValue}
+Let coupon_rate = COUPON(cusip)
+Let market_price = ${priceType === 'clean' ? 'CLEAN_PRICE(cusip)' : 'DIRTY_PRICE(cusip)'}
 
-annual_coupon = face_value * coupon_rate
-current_yield = annual_coupon / market_price
+Let annual_coupon = face_value * coupon_rate
+Let current_yield = annual_coupon / market_price
 
-__result__ = current_yield`
+Result = current_yield`
         break
         
       case 'ytm':
-        formula = `# Yield to Maturity Calculation
-# Internal rate of return on bond held to maturity
-market_price = ${priceType === 'clean' ? 'CLEAN_PRICE(cusip)' : 'DIRTY_PRICE(cusip)'}
-face_value = FACE_VALUE(cusip) or ${faceValue}
-coupon_rate = COUPON(cusip)
-maturity_date = MATURITY(cusip)
-frequency = "${frequency}"
-day_count = "${dayCount}"
+        formula = `' Yield to Maturity Calculation
+' Internal rate of return on bond held to maturity
+Let market_price = ${priceType === 'clean' ? 'CLEAN_PRICE(cusip)' : 'DIRTY_PRICE(cusip)'}
+Let face_value = FACE_VALUE(cusip) Or ${faceValue}
+Let coupon_rate = COUPON(cusip)
+Let maturity_date = MATURITY(cusip)
+Let frequency = "${frequency}"
+Let day_count = "${dayCount}"
 
-# YTM solver (approximation using Newton-Raphson)
-ytm = YTM(cusip)
+' YTM solver approximation
+Let ytm = YTM(cusip)
 
-__result__ = ytm`
+Result = ytm`
         break
         
       case 'ytc':
-        formula = `# Yield to Call Calculation
-# Yield if bond is called at earliest call date
-market_price = ${priceType === 'clean' ? 'CLEAN_PRICE(cusip)' : 'DIRTY_PRICE(cusip)'}
-call_date = CALL_DATE(cusip)
-call_price = CALL_PRICE(cusip)
-coupon_rate = COUPON(cusip)
-frequency = "${frequency}"
+        formula = `' Yield to Call Calculation
+' Yield if bond is called at earliest call date
+Let market_price = ${priceType === 'clean' ? 'CLEAN_PRICE(cusip)' : 'DIRTY_PRICE(cusip)'}
+Let call_date = CALL_DATE(cusip)
+Let call_price = CALL_PRICE(cusip)
+Let coupon_rate = COUPON(cusip)
+Let frequency = "${frequency}"
 
-ytc = YTC(cusip)
+Let ytc = YTC(cusip)
 
-__result__ = ytc`
+Result = ytc`
         break
         
       case 'ytw':
-        formula = `# Yield to Worst Calculation
-# Lowest yield considering all call dates
-ytm = YTM(cusip)
-ytc = YTC(cusip)
+        formula = `' Yield to Worst Calculation
+' Lowest yield considering all call dates
+Let ytm = YTM(cusip)
+Let ytc = YTC(cusip)
 
-yield_to_worst = min(ytm, ytc)
+Let yield_to_worst = Math.min(ytm, ytc)
 
-__result__ = yield_to_worst`
+Result = yield_to_worst`
         break
         
       case 'custom':
-        formula = `# Custom Yield Formula
-# Define your own yield calculation
-market_price = CLEAN_PRICE(cusip)
-coupon_rate = COUPON(cusip)
+        formula = `' Custom Yield Formula
+' Define your own yield calculation
+Let market_price = CLEAN_PRICE(cusip)
+Let coupon_rate = COUPON(cusip)
 
-# Add your custom logic here
-custom_yield = 0
+' Add your custom logic here
+Let custom_yield = 0
 
-__result__ = custom_yield`
+Result = custom_yield`
         break
     }
     

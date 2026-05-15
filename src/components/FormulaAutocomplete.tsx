@@ -65,7 +65,7 @@ const FORMULA_SUGGESTIONS: FormulaSuggestion[] = [
   },
   {
     id: 'duration-range',
-    formula: 'DURATION(cusip) >= min_duration && DURATION(cusip) <= max_duration',
+    formula: 'DURATION(cusip) >= min_duration And DURATION(cusip) <= max_duration',
     description: 'Duration range filter',
     category: 'comparison',
     context: ['duration']
@@ -114,21 +114,21 @@ const FORMULA_SUGGESTIONS: FormulaSuggestion[] = [
   },
   {
     id: 'conditional-next',
-    formula: 'if (condition) {\n  next()\n}',
+    formula: 'If condition Then\n  Next\nEnd If',
     description: 'Skip to next cell if condition true',
     category: 'common',
     context: ['if', 'next', 'condition']
   },
   {
     id: 'conditional-goto',
-    formula: 'if (condition) {\n  goto(cell_index)\n}',
+    formula: 'If condition Then\n  GoTo cell_index\nEnd If',
     description: 'Jump to cell if condition true',
     category: 'common',
     context: ['if', 'goto']
   },
   {
     id: 'assign-result',
-    formula: 'result(calculated_value)',
+    formula: 'Result = calculated_value',
     description: 'Set cell output',
     category: 'common',
     context: ['result', 'output']
@@ -142,7 +142,7 @@ const FORMULA_SUGGESTIONS: FormulaSuggestion[] = [
   },
   {
     id: 'basket-weighted-yield',
-    formula: `avg_yield = IG_Core.weightedAvg('YIELD')\nresult(avg_yield)`,
+    formula: `Let avg_yield = IG_Core.weightedAvg("YIELD")\nResult = avg_yield`,
     description: 'Calculate weighted average yield for a basket',
     category: 'yield',
     context: ['basket', 'weighted', 'yield']

@@ -140,53 +140,61 @@ export const PURPOSE_OPTIONS: Array<{ purpose: CellPurpose; label: string; descr
 ]
 
 const starterCode: Record<CellPurpose, string> = {
-  universe: `universe = securities.filter(s => s.rating >= 'A' && s.yield >= min_yield)
-result(universe)`,
-  data: `enriched = universe.map(s => ({
+  universe: `Set universe = securities.filter(s => s.rating >= "A" And s.yield >= min_yield)
+Result = universe`,
+  data: `Set enriched = universe.map(s => ({
   ...s,
   current_yield: (s.coupon / s.price) * 100,
   spread_score: s.spread ?? 0
 }))
-result(enriched)`,
-  calculation: `scored = enriched.map(s => ({
+Result = enriched`,
+  calculation: `Set scored = enriched.map(s => ({
   ...s,
   score: (s.current_yield * 0.7) - (s.duration * 0.2) + ((s.spread ?? 0) / 100)
 }))
-result(scored)`,
-  condition: `risk_pass = ranked.length > 0
-risk_reason = risk_pass ? 'Candidates available' : 'No candidates passed filters'
-result({ risk_pass, risk_reason })`,
-  ranking: `scored = enriched.map(s => ({
+Result = scored`,
+  condition: `Let risk_pass = ranked.length > 0
+If risk_pass Then
+  risk_reason = "Candidates available"
+Else
+  risk_reason = "No candidates passed filters"
+End If
+Result = { risk_pass, risk_reason }`,
+  ranking: `Set scored = enriched.map(s => ({
   ...s,
   score: (s.current_yield * 0.7) - (s.duration * 0.2) + ((s.spread ?? 0) / 100)
 }))
-ranked = scored.sort((a, b) => b.score - a.score)
-result(ranked)`,
-  risk: `selected = ranked.slice(0, target_holding_count)
-risk_pass = selected.every(s => s.duration <= max_duration)
-risk_reason = risk_pass ? 'All holdings within duration cap' : 'One or more holdings breach duration cap'
-result({ risk_pass, risk_reason, selected })`,
-  portfolio: `selected = ranked.slice(0, target_holding_count)
-portfolio = selected.map((s, index) => ({
+Set ranked = scored.sort((a, b) => b.score - a.score)
+Result = ranked`,
+  risk: `Set selected = ranked.slice(0, target_holding_count)
+Let risk_pass = selected.every(s => s.duration <= max_duration)
+If risk_pass Then
+  risk_reason = "All holdings within duration cap"
+Else
+  risk_reason = "One or more holdings breach duration cap"
+End If
+Result = { risk_pass, risk_reason, selected }`,
+  portfolio: `Set selected = ranked.slice(0, target_holding_count)
+Set portfolio = selected.map((s, index) => ({
   ...s,
   target_weight: Number((1 / selected.length).toFixed(4)),
   rank: index + 1
 }))
-result(portfolio)`,
-  trade: `best = selected?.[0] ?? ranked?.[0]
-if (best && risk_pass !== false) {
-  result({ action: 'buy', symbol: best.cusip, reason: 'Top ranked candidate passed risk checks' })
-} else {
-  result({ action: 'hold', reason: risk_reason ?? 'No eligible candidate' })
-}`,
-  allocation: `target_allocation = Object.fromEntries(
+Result = portfolio`,
+  trade: `Set best = selected?.[0] ?? ranked?.[0]
+If best And risk_pass <> false Then
+  Result = { action: "buy", symbol: best.cusip, reason: "Top ranked candidate passed risk checks" }
+Else
+  Result = { action: "hold", reason: risk_reason ?? "No eligible candidate" }
+End If`,
+  allocation: `Set target_allocation = Object.fromEntries(
   selected.slice(0, target_holding_count).map(s => [s.cusip, Number((1 / target_holding_count).toFixed(4))])
 )
-result({ target_allocation, rebalance_reason: 'Equal-weight target from ranked candidates' })`,
-  optimization: `objective = 'maximize risk-adjusted yield'
-result({ objective })`,
-  constraint: `constraint_pass = true
-result({ constraint_pass })`,
+Result = { target_allocation, rebalance_reason: "Equal-weight target from ranked candidates" }`,
+  optimization: `Let objective = "maximize risk-adjusted yield"
+Result = { objective }`,
+  constraint: `Let constraint_pass = True
+Result = { constraint_pass }`,
   general: '',
 }
 

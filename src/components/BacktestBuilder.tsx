@@ -10,13 +10,20 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import {
+  BracketsCurly,
   BookOpen,
+  CalendarBlank,
   ChartLine,
+  CheckCircle,
   ClockCounterClockwise,
+  Database,
   Download,
   Equals,
+  FileCsv,
   FloppyDisk,
   PlayCircle,
+  PlugsConnected,
+  Rows,
   Table as TableIcon,
   TrendDown,
   TrendUp,
@@ -61,6 +68,177 @@ const getRowCount = (data: unknown) => getRows(data).length
 const getDateValue = (row: Record<string, unknown>) => {
   const value = row.SessionDate ?? row.Date ?? row.date
   return typeof value === 'string' ? value : undefined
+}
+
+const parseDateValue = (value?: string) => {
+  if (!value) return undefined
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : undefined
+}
+
+const formatShortDate = (value?: string) => value ?? 'open'
+
+const getFieldSet = (rows: Array<Record<string, unknown>>) => {
+  const fieldSet = new Set<string>()
+  rows.forEach(row => Object.keys(row).forEach(field => fieldSet.add(field)))
+  return fieldSet
+}
+
+const hasAnyField = (fields: Set<string>, candidates: string[]) =>
+  candidates.some(candidate => fields.has(candidate))
+
+const getMissingFields = (fields: Set<string>) => {
+  const missing: string[] = []
+  if (!hasAnyField(fields, ['SessionDate', 'Date', 'date'])) missing.push('date')
+  if (!hasAnyField(fields, ['Close', 'close'])) missing.push('close')
+  if (!hasAnyField(fields, ['Volume', 'volume'])) missing.push('volume')
+  return missing
+}
+
+const analyzeDataFiles = (files: Record<string, any>) => {
+  const rowCounts: Record<string, number> = {}
+  const symbolFields: Record<string, string[]> = {}
+  const missingFields: Record<string, string[]> = {}
+  const fields = new Set<string>()
+  const dates: string[] = []
+
+  Object.entries(files).forEach(([symbol, data]) => {
+    const rows = getRows(data)
+    rowCounts[symbol] = rows.length
+    const fieldSet = getFieldSet(rows)
+    symbolFields[symbol] = Array.from(fieldSet).sort()
+    symbolFields[symbol].forEach(field => fields.add(field))
+    const missing = getMissingFields(fieldSet)
+    if (missing.length > 0) missingFields[symbol] = missing
+    rows.forEach(row => {
+      const date = getDateValue(row)
+      if (date) dates.push(date)
+    })
+  })
+
+  dates.sort()
+
+  return {
+    fields: Array.from(fields).sort(),
+    rowCounts,
+    symbolFields,
+    missingFields,
+    startDate: dates[0],
+    endDate: dates[dates.length - 1],
+    totalRows: Object.values(rowCounts).reduce((sum, count) => sum + count, 0),
+  }
+}
+
+const buildCustomDataset = (
+  current: StrategyDataset | null,
+  data: Record<string, any>,
+  importedSymbol: string,
+  fileName: string
+): StrategyDataset => {
+  const analysis = analyzeDataFiles(data)
+  const symbols = Object.keys(data)
+  const fingerprint = [
+    'custom',
+    symbols.join(','),
+    Object.entries(analysis.rowCounts).map(([symbol, count]) => `${symbol}:${count}`).join('|'),
+    analysis.startDate ?? 'no-start',
+    analysis.endDate ?? 'no-end',
+    analysis.fields.join(','),
+    Date.now(),
+  ].join('::')
+
+  return {
+    id: current?.category === 'custom' ? current.id : `custom-${Date.now()}`,
+    name: current?.category === 'custom' ? current.name : 'Custom Research Dataset',
+    description: 'Imported market data managed locally for strategy proofing.',
+    category: 'custom',
+    symbols,
+    period: analysis.startDate && analysis.endDate ? `${analysis.startDate} to ${analysis.endDate}` : 'custom window',
+    dataType: 'Imported CSV/JSON market rows',
+    useCase: current?.useCase ?? 'Custom signal logic',
+    fields: analysis.fields,
+    rowCounts: analysis.rowCounts,
+    startDate: analysis.startDate,
+    endDate: analysis.endDate,
+    coupons: current?.coupons,
+    provenance: {
+      provider: 'import',
+      source: fileName,
+      asOf: new Date().toISOString(),
+      notes: `Last import replaced ${importedSymbol}.`,
+    },
+    fingerprint,
+    data,
+    strategyTemplate: current?.strategyTemplate ?? '',
+    compatibleTemplateCategories: current?.compatibleTemplateCategories?.length
+      ? current.compatibleTemplateCategories
+      : ['Equity', 'Fixed Income', 'Portfolio', 'Trading'],
+  }
+}
+
+const parseCellValue = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (trimmed === 'true') return true
+  if (trimmed === 'false') return false
+  const numeric = Number(trimmed)
+  return Number.isFinite(numeric) && /^-?\d+(\.\d+)?$/.test(trimmed) ? numeric : trimmed
+}
+
+const parseCsvRows = (text: string): Array<Record<string, unknown>> => {
+  const rows: string[][] = []
+  let cell = ''
+  let row: string[] = []
+  let inQuotes = false
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index]
+    const next = text[index + 1]
+    if (char === '"' && inQuotes && next === '"') {
+      cell += '"'
+      index += 1
+    } else if (char === '"') {
+      inQuotes = !inQuotes
+    } else if (char === ',' && !inQuotes) {
+      row.push(cell)
+      cell = ''
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && next === '\n') index += 1
+      row.push(cell)
+      if (row.some(value => value.trim())) rows.push(row)
+      row = []
+      cell = ''
+    } else {
+      cell += char
+    }
+  }
+
+  row.push(cell)
+  if (row.some(value => value.trim())) rows.push(row)
+
+  const [rawHeaders, ...body] = rows
+  if (!rawHeaders) return []
+  const headers = rawHeaders.map((header, index) => header.replace(/^\uFEFF/, '').trim() || `field_${index + 1}`)
+
+  return body.map(values => Object.fromEntries(
+    headers.map((header, index) => [header, parseCellValue(values[index] ?? '')])
+  ))
+}
+
+const readImportedData = async (file: File) => {
+  const text = await file.text()
+  if (file.name.toLowerCase().endsWith('.csv')) return parseCsvRows(text)
+  return JSON.parse(text)
+}
+
+const getFreshness = (asOf?: string) => {
+  const timestamp = parseDateValue(asOf)
+  if (!timestamp) return { label: 'Unknown', detail: 'No as-of timestamp', variant: 'outline' as const }
+
+  const ageDays = Math.max(0, Math.floor((Date.now() - timestamp) / 86_400_000))
+  if (ageDays <= 7) return { label: 'Fresh', detail: `${ageDays} days old`, variant: 'default' as const }
+  if (ageDays <= 90) return { label: 'Aging', detail: `${ageDays} days old`, variant: 'secondary' as const }
+  return { label: 'Historical', detail: `${ageDays} days old`, variant: 'outline' as const }
 }
 
 const formatCurrency = (value: number) => {
@@ -197,9 +375,13 @@ export function BacktestBuilder({
   const [isRunning, setIsRunning] = useState(false)
   const [activeTab, setActiveTab] = useState('config')
   const [lastRunSignature, setLastRunSignature] = useState<string | null>(null)
+  const [importSymbol, setImportSymbol] = useState(defaultDataset?.symbols[0] ?? '')
 
-  const loadedRows = Object.values(dataFiles).reduce((total, data) => total + getRowCount(data), 0)
+  const datasetAnalysis = useMemo(() => analyzeDataFiles(dataFiles), [dataFiles])
+  const loadedRows = datasetAnalysis.totalRows
   const activeUniverse = selectedDataset?.symbols ?? Object.keys(dataFiles)
+  const activeFreshness = getFreshness(selectedDataset?.provenance.asOf)
+  const missingFieldEntries = Object.entries(datasetAnalysis.missingFields)
   const datasetFingerprint = buildDatasetFingerprint(selectedDataset, dataFiles)
   const runSignature = buildRunSignature(config, strategyCode, datasetFingerprint)
   const resultIsStale = Boolean(result && lastRunSignature !== runSignature)
@@ -240,6 +422,7 @@ export function BacktestBuilder({
       startDate: nextDataset.startDate ? new Date(nextDataset.startDate) : undefined,
       endDate: nextDataset.endDate ? new Date(nextDataset.endDate) : undefined,
     }))
+    setImportSymbol(nextDataset.symbols[0] ?? '')
     toast.success(`Loaded ${nextDataset.name}`)
   }
 
@@ -257,18 +440,31 @@ export function BacktestBuilder({
       startDate: recommendedDataset.startDate ? new Date(recommendedDataset.startDate) : undefined,
       endDate: recommendedDataset.endDate ? new Date(recommendedDataset.endDate) : undefined,
     }))
+    setImportSymbol(recommendedDataset.symbols[0] ?? '')
     toast.info(`Recommended ${recommendedDataset.name} for ${templateCategory}`)
   }, [templateCategory])
 
   const handleFileUpload = async (symbol: string, file: File) => {
     try {
-      const text = await file.text()
-      const data = JSON.parse(text)
-      setDataFiles(prev => ({ ...prev, [symbol]: data }))
-      setSelectedDataset(current => current ? { ...current, category: 'custom', fingerprint: `custom-${Date.now()}` } : current)
-      toast.success(`Loaded ${symbol} data`)
-    } catch {
-      toast.error(`Failed to load ${symbol} data`)
+      const normalizedSymbol = symbol.trim().toUpperCase()
+      if (!normalizedSymbol) {
+        toast.error('Enter a symbol before importing data')
+        return
+      }
+      const data = await readImportedData(file)
+      const nextDataFiles = { ...dataFiles, [normalizedSymbol]: data }
+      const nextDataset = buildCustomDataset(selectedDataset, nextDataFiles, normalizedSymbol, file.name)
+      setDataFiles(nextDataFiles)
+      setSelectedDataset(nextDataset)
+      setConfig(current => ({
+        ...current,
+        startDate: nextDataset.startDate ? new Date(nextDataset.startDate) : current.startDate,
+        endDate: nextDataset.endDate ? new Date(nextDataset.endDate) : current.endDate,
+      }))
+      setImportSymbol(normalizedSymbol)
+      toast.success(`Imported ${normalizedSymbol} ${file.name.toLowerCase().endsWith('.csv') ? 'CSV' : 'JSON'} data`)
+    } catch (error) {
+      toast.error(error instanceof SyntaxError ? 'Import failed: invalid JSON or CSV structure' : `Failed to import ${symbol.trim() || 'symbol'} data`)
     }
   }
 
@@ -507,86 +703,209 @@ export function BacktestBuilder({
         <TabsContent value="data" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Provider-Ready Fixture Data</CardTitle>
-              <CardDescription>Choose fixture-backed datasets shaped like a future AMX provider response.</CardDescription>
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database size={20} />
+                    Dataset & Provenance Manager
+                  </CardTitle>
+                  <CardDescription>Audit fixture and imported market data before running strategy proof.</CardDescription>
+                </div>
+                <Badge variant={activeFreshness.variant} className="w-fit">
+                  {activeFreshness.label} / {activeFreshness.detail}
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {datasets.map((dataset) => {
-                  const isSelected = selectedDataset?.id === dataset.id
-                  return (
-                    <button
-                      key={dataset.id}
-                      type="button"
-                      className={cn(
-                        'rounded-lg border p-4 text-left transition-colors hover:border-accent/50',
-                        isSelected && 'border-accent bg-accent/5'
-                      )}
-                      onClick={() => loadDataset(dataset.id)}
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-sm">{dataset.name}</span>
-                        {isSelected && <Badge className="h-5 text-[10px]">ACTIVE</Badge>}
-                        <Badge variant="outline" className="h-5 text-[10px]">{dataset.category}</Badge>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">{dataset.description}</p>
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {dataset.symbols.map(symbol => (
-                          <Badge key={symbol} variant="secondary" className="h-5 text-[10px]">
-                            {symbol}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="mt-3 grid grid-cols-1 gap-1 text-xs text-muted-foreground sm:grid-cols-2">
-                        <div>Rows: {Object.values(dataset.rowCounts).reduce((sum, count) => sum + count, 0).toLocaleString()}</div>
-                        <div>Fields: {dataset.fields.length}</div>
-                        <div className="sm:col-span-2">Template fit: {dataset.compatibleTemplateCategories.join(', ')}</div>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {selectedDataset && (
-                <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-                  <div className="flex items-center gap-2 font-medium">
-                    <TableIcon size={16} />
-                    Active Dataset Provenance
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4">
+                <div className="rounded-md border bg-background p-3">
+                  <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                    <PlugsConnected size={14} />
+                    Source
                   </div>
-                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                    <div><span className="text-muted-foreground">Provider:</span> {selectedDataset.provenance.provider}</div>
-                    <div><span className="text-muted-foreground">Source:</span> {selectedDataset.provenance.source}</div>
-                    <div><span className="text-muted-foreground">Window:</span> {selectedDataset.startDate} to {selectedDataset.endDate}</div>
-                    <div><span className="text-muted-foreground">Fingerprint:</span> <code className="text-xs">{selectedDataset.fingerprint.slice(0, 48)}...</code></div>
+                  <div className="mt-1 text-sm font-medium">{selectedDataset?.provenance.source ?? 'Custom upload'}</div>
+                  <div className="text-xs text-muted-foreground">{selectedDataset?.provenance.provider ?? 'custom'} provider</div>
+                  <div className="mt-2 truncate font-mono text-[11px] text-muted-foreground" title={selectedDataset?.fingerprint}>
+                    {selectedDataset?.fingerprint ? `fp ${selectedDataset.fingerprint.slice(0, 40)}...` : 'no fingerprint'}
                   </div>
                 </div>
-              )}
+                <div className="rounded-md border bg-background p-3">
+                  <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                    <CalendarBlank size={14} />
+                    Date Range
+                  </div>
+                  <div className="mt-1 text-sm font-medium">
+                    {formatShortDate(datasetAnalysis.startDate ?? selectedDataset?.startDate)} to {formatShortDate(datasetAnalysis.endDate ?? selectedDataset?.endDate)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">as of {selectedDataset?.provenance.asOf ? formatShortDate(selectedDataset.provenance.asOf.slice(0, 10)) : 'unknown'}</div>
+                </div>
+                <div className="rounded-md border bg-background p-3">
+                  <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                    <Rows size={14} />
+                    Row Counts
+                  </div>
+                  <div className="mt-1 text-sm font-medium">{loadedRows.toLocaleString()} rows</div>
+                  <div className="text-xs text-muted-foreground">{Object.keys(dataFiles).length} symbols / {datasetAnalysis.fields.length} fields</div>
+                </div>
+                <div className="rounded-md border bg-background p-3">
+                  <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+                    <CheckCircle size={14} />
+                    Template Fit
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {(selectedDataset?.compatibleTemplateCategories ?? ['Custom']).map(category => (
+                      <Badge key={category} variant="secondary" className="h-5 text-[10px]">
+                        {category}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-              <div className="border-t pt-4">
-                <Label className="text-base">Custom Upload</Label>
-                <div className="mt-3 grid grid-cols-1 gap-4">
-                  {activeUniverse.map(symbol => (
-                    <div key={symbol} className="rounded-lg border p-4">
-                      <div className="flex items-center justify-between">
-                        <Label>{symbol} Data</Label>
-                        <Badge variant="secondary">{getRowCount(dataFiles[symbol]).toLocaleString()} rows</Badge>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.1fr)]">
+                <div className="rounded-lg border bg-background p-4">
+                  <div className="flex items-center gap-2 font-medium">
+                    <TableIcon size={16} />
+                    Fixture Catalog
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {datasets.map((dataset) => {
+                      const isSelected = selectedDataset?.id === dataset.id
+                      return (
+                        <button
+                          key={dataset.id}
+                          type="button"
+                          className={cn(
+                            'w-full rounded-md border p-3 text-left transition-colors hover:border-accent/50',
+                            isSelected && 'border-accent bg-accent/5'
+                          )}
+                          onClick={() => loadDataset(dataset.id)}
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-sm">{dataset.name}</span>
+                            {isSelected && <Badge className="h-5 text-[10px]">ACTIVE</Badge>}
+                            <Badge variant="outline" className="h-5 text-[10px]">{dataset.category}</Badge>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {dataset.symbols.map(symbol => (
+                              <Badge key={symbol} variant="secondary" className="h-5 text-[10px]">
+                                {symbol}
+                              </Badge>
+                            ))}
+                          </div>
+                          <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                            <span>{Object.values(dataset.rowCounts).reduce((sum, count) => sum + count, 0).toLocaleString()} rows</span>
+                            <span>{dataset.fields.length} fields</span>
+                            <span className="col-span-2">{dataset.startDate} to {dataset.endDate}</span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-lg border bg-background p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Rows size={16} />
+                        Active Dataset Rows
                       </div>
-                      <div className="mt-2 flex gap-2">
-                        <Input
-                          type="file"
-                          accept=".json"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) handleFileUpload(symbol, file)
-                          }}
-                        />
-                        <Button variant="outline" size="sm">
-                          <Upload size={16} className="mr-2" />
-                          Upload
-                        </Button>
+                      <Badge variant="outline" className="w-fit">{selectedDataset?.name ?? 'Custom dataset'}</Badge>
+                    </div>
+                    <div className="mt-3 overflow-hidden rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Symbol</TableHead>
+                            <TableHead>Rows</TableHead>
+                            <TableHead>Fields</TableHead>
+                            <TableHead>Missing Fields</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {Object.keys(dataFiles).map(symbol => (
+                            <TableRow key={symbol}>
+                              <TableCell className="font-semibold">{symbol}</TableCell>
+                              <TableCell>{(datasetAnalysis.rowCounts[symbol] ?? 0).toLocaleString()}</TableCell>
+                              <TableCell>{datasetAnalysis.symbolFields[symbol]?.length ?? 0}</TableCell>
+                              <TableCell>
+                                {datasetAnalysis.missingFields[symbol]?.length ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {datasetAnalysis.missingFields[symbol].map(field => (
+                                      <Badge key={field} variant="outline" className="h-5 text-[10px]">
+                                        {field}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">none</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="rounded-lg border bg-background p-4">
+                      <div className="flex items-center gap-2 font-medium">
+                        <WarningCircle size={16} />
+                        Missing Fields
+                      </div>
+                      <div className="mt-3 space-y-2 text-sm">
+                        {missingFieldEntries.length === 0 ? (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <CheckCircle size={16} className="text-success" weight="fill" />
+                            No date, close, or volume gaps detected.
+                          </div>
+                        ) : missingFieldEntries.map(([symbol, fields]) => (
+                          <div key={symbol} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
+                            <span className="font-medium">{symbol}</span>
+                            <span className="text-xs text-muted-foreground">{fields.join(', ')}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+
+                    <div className="rounded-lg border bg-background p-4">
+                      <div className="flex items-center gap-2 font-medium">
+                        <BracketsCurly size={16} />
+                        Import CSV/JSON
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(120px,0.35fr)_minmax(0,0.65fr)]">
+                        <div className="space-y-2">
+                          <Label htmlFor="dataset-import-symbol">Symbol</Label>
+                          <Input
+                            id="dataset-import-symbol"
+                            value={importSymbol}
+                            onChange={(event) => setImportSymbol(event.target.value)}
+                            placeholder="AAPL"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="dataset-import-file">File</Label>
+                          <Input
+                            id="dataset-import-file"
+                            type="file"
+                            accept=".json,.csv,application/json,text/csv"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0]
+                              if (file) handleFileUpload(importSymbol, file)
+                              event.currentTarget.value = ''
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1"><FileCsv size={14} /> CSV</span>
+                        <span className="inline-flex items-center gap-1"><BracketsCurly size={14} /> JSON</span>
+                        <span className="inline-flex items-center gap-1"><Upload size={14} /> replaces matching symbol</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

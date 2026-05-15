@@ -23,7 +23,7 @@ The field picker includes:
 ### 2. Formula Autocomplete
 Start typing a formula and get instant suggestions:
 
-**Example:** Type `current_yield = ` and choose from:
+**Example:** Type `Let current_yield = ` and choose from:
 - `annual_coupon / market_price`
 - `face_value * coupon_rate / clean_price`
 - `COUPON(cusip) / PRICE(cusip)`
@@ -38,7 +38,7 @@ Features:
 
 1. **Create a new strategy cell**
 2. **Switch to Formula mode**
-3. **Start typing:** `current_yield = `
+3. **Start typing:** `Let current_yield = `
 4. **See autocomplete suggestions appear**
 5. **Navigate with arrow keys and press Enter to insert**
 
@@ -52,7 +52,7 @@ The app combines three modes for maximum flexibility:
 
 - **Visual Mode**: Drag-and-drop conditions with searchable field picker
 - **Formula Mode**: Excel-like formulas with intelligent autocomplete
-- **Code Mode**: Full Python-style control flow with autocomplete support
+- **Code Mode**: VBA-style strategy syntax with autocomplete support
 
 All three modes sync automatically, so you can switch between them at any time.
 

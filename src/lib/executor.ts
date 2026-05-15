@@ -121,13 +121,21 @@ export class StrategyExecutor {
   }
 
   private createSafeFunction(code: string, capturedVariables: string[]): Function {
-    const varDeclarations = Object.keys(this.context.variables)
+    const contextNames = Object.keys(this.context.variables)
+    const validIdentifier = /^[A-Za-z_$][A-Za-z0-9_$]*$/
+    const varDeclarations = contextNames
+      .filter(key => validIdentifier.test(key))
       .map(key => `let ${key} = __context__.${key}`)
       .join(';\n')
-    const snapshotNames = Array.from(new Set([...Object.keys(this.context.variables), ...capturedVariables]))
+    const capturedDeclarations = capturedVariables
+      .filter(key => validIdentifier.test(key) && !contextNames.includes(key))
+      .map(key => `let ${key}`)
+      .join(';\n')
+    const snapshotNames = Array.from(new Set([...contextNames, ...capturedVariables]))
 
     const fullCode = `
       ${varDeclarations};
+      ${capturedDeclarations};
       
       let __result__ = null;
       let __controlFlow__ = { type: 'none' };

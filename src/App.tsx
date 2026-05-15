@@ -1117,7 +1117,7 @@ function App() {
                     <TabsContent value="inspector" className="mt-0 flex-1 min-h-0 overflow-hidden">
                       <ScrollArea className="h-full">
                         <div className="space-y-4 pr-2">
-                          <ContextInspector context={executionContext} />
+                          <ContextInspector context={executionContext} cells={safeStrategy.cells} />
                           <ParameterPanel
                             parameters={Array.isArray(safeStrategy.parameters) ? safeStrategy.parameters : []}
                             onParametersChange={handleParametersChange}
@@ -1210,28 +1210,28 @@ function App() {
               <h3 className="text-base font-medium mb-4">Control Flow & Syntax</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">if (cond) &#123; next() &#125;</span>
+                  <span className="text-accent font-semibold text-base">If cond Then Next</span>
                   <p className="text-muted-foreground mt-1.5 leading-relaxed">Skip to next cell if true</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">if (cond) &#123; goto(5) &#125;</span>
+                  <span className="text-accent font-semibold text-base">If cond Then GoTo 5</span>
                   <p className="text-muted-foreground mt-1.5 leading-relaxed">Jump to cell 5 if true</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">goto(3)</span>
+                  <span className="text-accent font-semibold text-base">GoTo 3</span>
                   <p className="text-muted-foreground mt-1.5 leading-relaxed">Jump to cell 3</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">basket IG_Core:</span>
+                  <span className="text-accent font-semibold text-base">Basket IG_Core:</span>
                   <p className="text-muted-foreground mt-1.5 leading-relaxed">Declare a multi-CUSIP basket</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">result(value)</span>
+                  <span className="text-accent font-semibold text-base">Result = value</span>
                   <p className="text-muted-foreground mt-1.5 leading-relaxed">Set cell output</p>
                 </div>
                 <div className="font-mono">
-                  <span className="text-accent font-semibold text-base">IG_Core.weightedAvg('YIELD')</span>
-                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Analyze a multi-CUSIP basket</p>
+                  <span className="text-accent font-semibold text-base">For Each s In securities</span>
+                  <p className="text-muted-foreground mt-1.5 leading-relaxed">Loop through securities with Next</p>
                 </div>
               </div>
             </div>
