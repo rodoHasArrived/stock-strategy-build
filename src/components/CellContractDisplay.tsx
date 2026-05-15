@@ -15,6 +15,11 @@ export function CellContractDisplay({ contract, validationResult, compact = fals
   if (compact) {
     return (
       <div className="flex items-center gap-2 flex-wrap">
+        {contract.description && (
+          <Badge variant="secondary" className="max-w-full truncate text-xs">
+            {contract.description}
+          </Badge>
+        )}
         {contract.inputs.length > 0 && (
           <Badge variant="outline" className="text-xs gap-1">
             <ArrowRight size={12} className="text-primary" />
@@ -36,6 +41,11 @@ export function CellContractDisplay({ contract, validationResult, compact = fals
         <Badge variant="secondary" className="text-xs">
           {contract.failureBehavior}
         </Badge>
+        {contract.tags?.slice(0, 2).map(tag => (
+          <Badge key={tag} variant="outline" className="text-xs">
+            #{tag}
+          </Badge>
+        ))}
         {validationResult && !validationResult.valid && (
           <Badge variant="destructive" className="text-xs gap-1">
             <XCircle size={12} weight="fill" />

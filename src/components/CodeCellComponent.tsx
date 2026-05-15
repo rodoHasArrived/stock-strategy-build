@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useRef, useState } from 'react'
-import { CodeCell as CodeCellType, CellMode, Condition, CellComment, CellContract } from '@/lib/types'
+import { CodeCell as CodeCellType, CellMode, Condition, CellComment, CellContract, DesignPreviewResult } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +15,7 @@ import { FormulaAutocomplete } from '@/components/FormulaAutocomplete'
 import { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
 import { CellContractEditor } from '@/components/CellContractEditor'
 import { CellContractDisplay } from '@/components/CellContractDisplay'
+import { DesignPreviewRows } from '@/components/DesignPreviewRows'
 import type { OnMount } from '@monaco-editor/react'
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react'))
@@ -43,6 +44,7 @@ const PURPOSE_LABELS: Record<CodeCellType['purpose'], string> = {
   portfolio: 'Portfolio',
   risk: 'Risk',
   trade: 'Trade',
+  allocation: 'Allocation',
   optimization: 'Optimization',
   constraint: 'Constraint',
   general: 'General'
@@ -66,6 +68,7 @@ interface CodeCellProps {
   dragHandleProps?: DraggableProvidedDragHandleProps | null
   onActivate?: (mode: CellMode) => void
   isActive?: boolean
+  designPreview?: DesignPreviewResult
 }
 
 export function CodeCellComponent({ 
@@ -82,7 +85,8 @@ export function CodeCellComponent({
   currentUser,
   dragHandleProps,
   onActivate,
-  isActive = false
+  isActive = false,
+  designPreview
 }: CodeCellProps) {
   const [cellLabel, setCellLabel] = useState(cell.label || '')
   const [showContractEditor, setShowContractEditor] = useState(false)
@@ -566,6 +570,10 @@ export function CodeCellComponent({
                 </div>
               </TabsContent>
             </Tabs>
+
+            {designPreview && (
+              <DesignPreviewRows preview={designPreview} />
+            )}
 
             {hasOutput && (
               <div className="overflow-hidden rounded-md border border-success/25 bg-success/5">

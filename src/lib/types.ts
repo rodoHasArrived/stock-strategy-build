@@ -15,6 +15,7 @@ export type CellPurpose =
   | 'portfolio' 
   | 'risk' 
   | 'trade'
+  | 'allocation'
   | 'optimization'
   | 'constraint'
   | 'general'
@@ -334,6 +335,41 @@ export interface BacktestConfig {
   volumeCapPct: number
   slippageModel: 'fixed' | 'adaptive' | 'custom'
   customSlippageFn?: string
+}
+
+export interface CellContractPreset {
+  id: string
+  name: string
+  description: string
+  contract: CellContract
+}
+
+export type StrategySetupFamily = 'fixed-income-yield' | 'equity-momentum' | 'allocation'
+export type StrategySetupOutputMode = 'trade-signal' | 'target-allocation'
+
+export interface StrategySetupDraft {
+  family: StrategySetupFamily
+  universe: 'investment-grade' | 'equity-factors' | 'multi-asset'
+  datasetFit: 'fixture' | 'custom'
+  outputMode: StrategySetupOutputMode
+  includeRiskControls: boolean
+  rebalanceCadence: 'daily' | 'weekly' | 'monthly'
+}
+
+export interface StrategyChecklistItem {
+  id: string
+  label: string
+  status: 'complete' | 'warning' | 'missing'
+  detail: string
+  cellIndex?: number
+  action?: 'open-wizard' | 'add-cell' | 'run-backtest' | 'name-strategy'
+}
+
+export interface DesignPreviewResult {
+  status: 'ready' | 'empty' | 'blocked' | 'error'
+  message: string
+  columns: string[]
+  rows: Array<Record<string, string | number | boolean | null>>
 }
 
 export type DatasetFingerprint = string

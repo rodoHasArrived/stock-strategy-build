@@ -69,6 +69,7 @@ const PURPOSE_COLORS: Record<CodeCell['purpose'], string> = {
   portfolio: 'bg-accent/20 text-accent border-accent/40',
   risk: 'bg-destructive/15 text-destructive border-destructive/35',
   trade: 'bg-success/15 text-success border-success/35',
+  allocation: 'bg-success/15 text-success border-success/35',
   optimization: 'bg-warning/15 text-warning border-warning/35',
   constraint: 'bg-destructive/15 text-destructive border-destructive/35',
   general: 'bg-muted text-muted-foreground border-border',

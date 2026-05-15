@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import { Plus, Trash, Check, X } from '@phosphor-icons/react'
 import { CellContract, TypedField, ValidationRule, DataType, FailureBehavior } from '@/lib/types'
+import { CONTRACT_PRESETS, cloneContractPreset } from '@/lib/strategyDesign'
 
 interface CellContractEditorProps {
   contract?: CellContract
@@ -97,6 +98,10 @@ export function CellContractEditor({ contract, onChange, onClose }: CellContract
     onClose()
   }
 
+  const handlePresetApply = (presetId: string) => {
+    setLocalContract(cloneContractPreset(presetId))
+  }
+
   return (
     <Card className="border-2 border-accent/50">
       <CardHeader>
@@ -120,6 +125,25 @@ export function CellContractEditor({ contract, onChange, onClose }: CellContract
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 rounded-lg border bg-muted/30 p-3">
+          <Label className="text-sm font-medium">Output Contract Preset</Label>
+          <p className="mb-2 mt-1 text-xs text-muted-foreground">
+            Start from a known strategy output shape, then edit fields as needed.
+          </p>
+          <Select onValueChange={handlePresetApply}>
+            <SelectTrigger>
+              <SelectValue placeholder="Apply preset..." />
+            </SelectTrigger>
+            <SelectContent>
+              {CONTRACT_PRESETS.map((preset) => (
+                <SelectItem key={preset.id} value={preset.id}>
+                  {preset.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <Tabs defaultValue="inputs" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="inputs">Inputs</TabsTrigger>

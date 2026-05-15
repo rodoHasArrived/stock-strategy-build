@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CodeCell, Parameter, RunTraceEntry, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate, BacktestConfig, BacktestResult, TransitionRule, GovernanceConfig, BacktestRunRecord, StrategyVersionRecord } from '@/lib/types'
+import { CodeCell, Parameter, RunTraceEntry, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate, BacktestConfig, BacktestResult, TransitionRule, GovernanceConfig, BacktestRunRecord, StrategyVersionRecord, CellPurpose } from '@/lib/types'
 import { CodeCellComponent } from '@/components/CodeCellComponent'
 import { ParameterPanel } from '@/components/ParameterPanel'
 import { ContextInspector } from '@/components/ContextInspector'
@@ -18,6 +18,10 @@ import { TemplateGallery } from '@/components/TemplateGallery'
 import { BacktestBuilder } from '@/components/BacktestBuilder'
 import { RunTraceViewer } from '@/components/RunTraceViewer'
 import { GovernancePanel } from '@/components/GovernancePanel'
+import { StrategySetupWizard } from '@/components/StrategySetupWizard'
+import { PurposeCellDialog } from '@/components/PurposeCellDialog'
+import { StrategyBlueprint } from '@/components/StrategyBlueprint'
+import { StrategyChecklist } from '@/components/StrategyChecklist'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -25,7 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
-import { FloppyDisk, Code, Plus, PlayCircle, FlowArrow, Database, Calculator, SidebarSimple, ChartLine, DownloadSimple, Columns, Shield } from '@phosphor-icons/react'
+import { FloppyDisk, Code, PlayCircle, FlowArrow, Database, Calculator, SidebarSimple, ChartLine, DownloadSimple, Columns, Shield, ListChecks } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { BacktestEngine } from '@/lib/backtestEngine'
@@ -33,6 +37,7 @@ import { DataFrame, readJSON, toDatetime, toNumeric } from '@/lib/dataFrame'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { cn } from '@/lib/utils'
 import { saveStrategyExternal, saveRunLog, downloadJSON, listStrategyVersionRecords, saveStrategyVersionRecord } from '@/lib/persistence'
+import { buildDesignPreview, buildStrategyChecklist, createPurposeCell } from '@/lib/strategyDesign'
 
 type ActiveInsertionTarget = {
   cellIndex: number
@@ -94,9 +99,9 @@ function App() {
   const [highlightedCell, setHighlightedCell] = useState<number | undefined>(undefined)
   const [activeTab, setActiveTab] = useState<string>('backtest')
   const [leftPanelTab, setLeftPanelTab] = useState<'data' | 'tools'>('data')
-  const [rightPanelTab, setRightPanelTab] = useState<'inspector' | 'trace' | 'governance'>('inspector')
-  /** 'notebook' = cells only, 'map' = flow only, 'split' = side-by-side */
-  const [viewMode, setViewMode] = useState<'notebook' | 'map' | 'split'>('notebook')
+  const [rightPanelTab, setRightPanelTab] = useState<'inspector' | 'trace' | 'checklist' | 'governance'>('inspector')
+  /** 'notebook' = cells only, 'map' = flow only, 'split' = side-by-side, 'blueprint' = purpose-first */
+  const [viewMode, setViewMode] = useState<'notebook' | 'map' | 'split' | 'blueprint'>('notebook')
   const [activeInsertionTarget, setActiveInsertionTarget] = useState<ActiveInsertionTarget>({
     cellIndex: 0,
     mode: 'formula'
@@ -205,19 +210,27 @@ function App() {
     toast.info('Cell duplicated')
   }
 
-  const handleAddCell = () => {
+  const handleAddPurposeCell = (newCell: CodeCell) => {
     setStrategy((current) => {
       if (!current || !Array.isArray(current.cells)) {
         return createDefaultStrategy()
       }
-      const newIndex = current.cells.length
-      const newCell: CodeCell = createDefaultCell(newIndex)
+      const cellWithIndex: CodeCell = {
+        ...newCell,
+        id: `cell-${current.cells.length}`,
+        index: current.cells.length,
+      }
       return {
         ...current,
-        cells: [...current.cells, newCell],
+        cells: [...current.cells, cellWithIndex],
         updatedAt: Date.now()
       }
     })
+    toast.success(`${newCell.label ?? 'Cell'} added`)
+  }
+
+  const handleAddBlueprintPurpose = (purpose: CellPurpose) => {
+    handleAddPurposeCell(createPurposeCell(safeStrategy.cells.length, purpose))
   }
 
   const handleRunCell = async (index: number) => {
@@ -491,6 +504,7 @@ function App() {
     : 'Choose a cell to insert fields'
 
   const latestVersion = versionHistory.find(record => record.strategyId === safeStrategy.id)
+  const strategyChecklist = buildStrategyChecklist(safeStrategy, isBacktestProofStale)
   const derivedTrades: Trade[] = currentBacktestRun?.result.trades.map((trade, index) => ({
     id: `backtest-trade-${index}`,
     security: trade.symbol,
@@ -501,6 +515,31 @@ function App() {
     reason: 'REBALANCE',
     reasonDetails: trade.reason,
   })) ?? []
+
+  const focusCell = (index: number, nextViewMode: typeof viewMode = 'notebook') => {
+    setHighlightedCell(index)
+    setActiveTab('cells')
+    setViewMode(nextViewMode)
+    setTimeout(() => {
+      const element = document.getElementById(`cell-${index}`)
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 100)
+  }
+
+  const handleChecklistItemClick = (item: (typeof strategyChecklist)[number]) => {
+    if (item.cellIndex != null) {
+      focusCell(item.cellIndex)
+      return
+    }
+    if (item.action === 'run-backtest') {
+      setActiveTab('backtest')
+    } else if (item.action === 'add-cell') {
+      setActiveTab('cells')
+      setViewMode('blueprint')
+    } else if (item.action === 'name-strategy') {
+      document.getElementById('strategy-name')?.focus()
+    }
+  }
 
   const renderInsertionTargetHint = () => (
     <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3">
@@ -584,6 +623,18 @@ function App() {
     setCurrentBacktestRun(null)
     setIsBacktestProofStale(false)
     toast.success(`Loaded template: ${template.name}`)
+  }
+
+  const handleCreateStrategyFromWizard = (nextStrategy: Strategy) => {
+    setStrategy(nextStrategy)
+    setSelectedTemplateCategory(undefined)
+    setCurrentBacktestRun(null)
+    setIsBacktestProofStale(false)
+    setRunTrace([])
+    setActiveTab('cells')
+    setViewMode('blueprint')
+    setRightPanelTab('checklist')
+    toast.success(`Created strategy: ${nextStrategy.name}`)
   }
 
   const handleDragEnd = (result: DropResult) => {
@@ -808,6 +859,7 @@ function App() {
               />
             </div>
             <div className="flex items-center gap-2">
+              <StrategySetupWizard onCreateStrategy={handleCreateStrategyFromWizard} />
               <TemplateGallery onLoadTemplate={handleLoadTemplate} />
               <Button onClick={handleRunAll} size="default" variant="default">
                 <PlayCircle size={18} className="mr-2" weight="fill" />
@@ -880,6 +932,16 @@ function App() {
                         </Button>
                         <Button
                           size="sm"
+                          variant={viewMode === 'blueprint' ? 'secondary' : 'ghost'}
+                          className="h-8 px-2.5 text-xs gap-1.5"
+                          onClick={() => setViewMode('blueprint')}
+                          title="Blueprint view"
+                        >
+                          <ListChecks size={14} />
+                          <span className="hidden sm:inline">Blueprint</span>
+                        </Button>
+                        <Button
+                          size="sm"
                           variant={viewMode === 'map' ? 'secondary' : 'ghost'}
                           className="h-8 px-2.5 text-xs gap-1.5"
                           onClick={() => setViewMode('map')}
@@ -891,10 +953,10 @@ function App() {
                       </div>
                     )}
 
-                    <Button onClick={handleAddCell} size="default" variant="outline">
-                      <Plus size={18} className="mr-2" />
-                      <span className="text-sm">Add Cell</span>
-                    </Button>
+                    <PurposeCellDialog
+                      nextIndex={safeStrategy.cells.length}
+                      onAddCell={handleAddPurposeCell}
+                    />
                   </div>
 
                   {/* Cells / Backtest content */}
@@ -920,6 +982,15 @@ function App() {
 
                     <TabsContent value="cells" className="flex-1 min-h-0 mt-0">
                       <div className={cn("h-full", viewMode === 'split' ? "flex gap-4" : "")}>
+                        {viewMode === 'blueprint' && (
+                          <StrategyBlueprint
+                            cells={safeStrategy.cells}
+                            highlightedCell={highlightedCell}
+                            onCellClick={(index) => focusCell(index)}
+                            onAddPurpose={handleAddBlueprintPurpose}
+                          />
+                        )}
+
                         {/* Notebook pane */}
                         {(viewMode === 'notebook' || viewMode === 'split') && (
                           <div className={cn("flex flex-col min-h-0", viewMode === 'split' ? "flex-1 min-w-0" : "h-full")}>
@@ -961,6 +1032,7 @@ function App() {
                                                   dragHandleProps={provided.dragHandleProps}
                                                   onActivate={(mode) => handleActivateCell(cell.index, mode)}
                                                   isActive={activeInsertionTarget.cellIndex === cell.index}
+                                                  designPreview={buildDesignPreview(cell, safeStrategy.cells.slice(0, index))}
                                                 />
                                               </div>
 
@@ -1020,7 +1092,7 @@ function App() {
                 {/* Right panel with tabbed sections */}
                 <div className="lg:col-span-1 flex flex-col gap-0 min-h-0">
                   <Tabs value={rightPanelTab} onValueChange={(v) => setRightPanelTab(v as typeof rightPanelTab)} className="flex flex-col flex-1 min-h-0">
-                    <TabsList className="w-full grid grid-cols-3 h-9 mb-3 flex-shrink-0">
+                    <TabsList className="w-full grid grid-cols-4 h-9 mb-3 flex-shrink-0">
                       <TabsTrigger value="inspector" className="text-xs gap-1">
                         Inspector
                       </TabsTrigger>
@@ -1031,6 +1103,10 @@ function App() {
                             {runTrace.length}
                           </Badge>
                         )}
+                      </TabsTrigger>
+                      <TabsTrigger value="checklist" className="text-xs gap-1">
+                        <ListChecks size={12} />
+                        Checks
                       </TabsTrigger>
                       <TabsTrigger value="governance" className="text-xs gap-1">
                         <Shield size={12} />
@@ -1094,6 +1170,17 @@ function App() {
                               }}
                             />
                           )}
+                        </div>
+                      </ScrollArea>
+                    </TabsContent>
+
+                    <TabsContent value="checklist" className="mt-0 flex-1 min-h-0 overflow-hidden">
+                      <ScrollArea className="h-full">
+                        <div className="pr-2">
+                          <StrategyChecklist
+                            items={strategyChecklist}
+                            onItemClick={handleChecklistItemClick}
+                          />
                         </div>
                       </ScrollArea>
                     </TabsContent>
