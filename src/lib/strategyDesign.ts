@@ -6,6 +6,7 @@ import {
   DesignPreviewResult,
   Parameter,
   Strategy,
+  StrategyDataset,
   StrategyChecklistItem,
   StrategySetupDraft,
 } from './types'
@@ -386,16 +387,56 @@ export const buildStrategyChecklist = (
   ]
 }
 
-const securityRows = () => mockSecurities.slice(0, 5).map(security => ({
+const getRows = (data: unknown): Array<Record<string, unknown>> => {
+  if (Array.isArray(data)) return data as Array<Record<string, unknown>>
+  if (data && typeof data === 'object' && Array.isArray((data as { data?: unknown[] }).data)) {
+    return (data as { data: Array<Record<string, unknown>> }).data
+  }
+  return []
+}
+
+const datasetRows = (dataset?: StrategyDataset | null) => {
+  if (!dataset) return []
+  return Object.entries(dataset.data)
+    .flatMap(([symbol, data]) => getRows(data).slice(0, 3).map(row => {
+      const close = Number(row.Close ?? row.close ?? row.Price ?? row.price)
+      const volume = Number(row.Volume ?? row.volume ?? 0)
+      const coupon = dataset.coupons?.[symbol]
+      const derivedYield = coupon != null && Number.isFinite(close) && close > 0
+        ? Number(((coupon / close) * 100).toFixed(2))
+        : undefined
+
+      return {
+        symbol,
+        cusip: symbol,
+        name: symbol,
+        rating: dataset.category === 'fixed-income' ? 'A' : 'n/a',
+        close: Number.isFinite(close) ? close : null,
+        price: Number.isFinite(close) ? close : null,
+        volume,
+        yield: derivedYield ?? 0,
+        duration: dataset.category === 'fixed-income' ? 5 : 0,
+        spread: 0,
+      }
+    }))
+    .slice(0, 5)
+}
+
+const securityRows = (dataset?: StrategyDataset | null) => {
+  const activeRows = datasetRows(dataset)
+  if (activeRows.length > 0) return activeRows
+
+  return mockSecurities.slice(0, 5).map(security => ({
   cusip: security.cusip,
   name: security.name,
   rating: security.rating,
   yield: security.yield,
   duration: security.duration,
   spread: security.spread ?? 0,
-}))
+  }))
+}
 
-export const buildDesignPreview = (cell: CodeCell, priorCells: CodeCell[]): DesignPreviewResult => {
+export const buildDesignPreview = (cell: CodeCell, priorCells: CodeCell[], dataset?: StrategyDataset | null): DesignPreviewResult => {
   if (!cell.code.trim() && (!cell.visualConfig || Object.keys(cell.visualConfig).length === 0)) {
     return { status: 'empty', message: 'Add code or visual rules to preview this cell.', columns: [], rows: [] }
   }
@@ -416,7 +457,7 @@ export const buildDesignPreview = (cell: CodeCell, priorCells: CodeCell[]): Desi
     return { status: 'error', message: 'Preview skipped because this cell contains unsafe preview-only syntax.', columns: [], rows: [] }
   }
 
-  const baseRows = securityRows()
+  const baseRows = securityRows(dataset)
   const rows = (() => {
     switch (cell.purpose) {
       case 'universe':
@@ -450,7 +491,11 @@ export const buildDesignPreview = (cell: CodeCell, priorCells: CodeCell[]): Desi
 
   return {
     status: rows.length > 0 ? 'ready' : 'empty',
-    message: rows.length > 0 ? 'Preview uses mock securities and does not update run history.' : 'No preview rows matched this cell.',
+    message: rows.length > 0
+      ? dataset
+        ? `Preview uses ${dataset.name} sample rows and does not update run history.`
+        : 'Preview uses mock securities and does not update run history.'
+      : 'No preview rows matched this cell.',
     columns: rows.length > 0 ? Object.keys(rows[0]).slice(0, 6) : [],
     rows,
   }

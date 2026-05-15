@@ -81,6 +81,10 @@ const pbYield = marketData.PB_Yield
 const yieldSpread = paYield - pbYield
 const holding = state.positions?.PA > 0 ? 'PA' : state.positions?.PB > 0 ? 'PB' : null
 
+if (holding === null && yieldSpread > 0.2) {
+  return { action: 'buy', symbol: 'PA', reason: \`Spread \${yieldSpread.toFixed(3)} favors PA\` }
+}
+
 if ((holding === null || holding === 'PA') && yieldSpread < -0.2) {
   return { action: 'buy', symbol: 'PB', reason: \`Spread \${yieldSpread.toFixed(3)} favors PB\` }
 }

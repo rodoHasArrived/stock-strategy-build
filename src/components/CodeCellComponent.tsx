@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { CodeCell as CodeCellType, CellMode, Condition, CellComment, CellContract, DesignPreviewResult } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -91,6 +91,7 @@ export function CodeCellComponent({
   const [showContractEditor, setShowContractEditor] = useState(false)
   const [isCodeDropTarget, setIsCodeDropTarget] = useState(false)
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
+  const latestCodeRef = useRef(cell.code)
   
   const cellComments = comments.filter(c => c.cellId === cell.id)
   const unresolvedComments = cellComments.filter(c => !c.parentId && !c.resolved).length
@@ -98,6 +99,10 @@ export function CodeCellComponent({
   const purposeLabel = PURPOSE_LABELS[cell.purpose] ?? cell.purpose
   const codeLineCount = cell.code.trim() ? cell.code.split('\n').length : 0
   const hasOutput = Boolean(cell.output && cell.status !== 'error')
+
+  useEffect(() => {
+    latestCodeRef.current = cell.code
+  }, [cell.code])
 
   const getStatusBadge = () => {
     switch (cell.status) {
@@ -175,11 +180,17 @@ export function CodeCellComponent({
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       onRun()
     })
-  }, [onRun])
+    editor.onDidFocusEditorWidget(() => {
+      onActivate?.('code')
+    })
+  }, [onRun, onActivate])
 
   const appendSnippetToCode = useCallback((snippet: string) => {
-    onCodeChange(cell.code ? `${cell.code}${cell.code.endsWith('\n') ? '' : '\n'}${snippet}` : snippet)
-  }, [cell.code, onCodeChange])
+    const currentCode = latestCodeRef.current
+    const nextCode = currentCode ? `${currentCode}${currentCode.endsWith('\n') ? '' : '\n'}${snippet}` : snippet
+    latestCodeRef.current = nextCode
+    onCodeChange(nextCode)
+  }, [onCodeChange])
 
   const insertIntoCodeEditor = useCallback((snippet: string) => {
     const editor = editorRef.current
@@ -209,11 +220,23 @@ export function CodeCellComponent({
     editor.focus()
   }, [appendSnippetToCode, onCodeChange])
 
+  const handleShellClick = (event: MouseEvent<HTMLElement>) => {
+    const target = event.target
+    if (target instanceof HTMLElement) {
+      const interactiveTarget = target.closest(
+        'button, input, textarea, select, [role="button"], [role="tab"], [data-insertion-surface], .monaco-editor'
+      )
+
+      if (interactiveTarget) return
+    }
+
+    setActiveMode(cell.mode)
+  }
+
   return (
     <section 
       id={`cell-${cell.index}`}
-      onClick={() => setActiveMode(cell.mode)}
-      onFocusCapture={() => setActiveMode(cell.mode)}
+      onClick={handleShellClick}
       className={cn(
         'relative overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm transition-all scroll-mt-6',
         isActive && 'ring-2 ring-accent/35 border-accent/60 shadow-md',
@@ -521,8 +544,9 @@ export function CodeCellComponent({
                        Drag fields in or press Cmd/Ctrl+Enter to run
                      </div>
                    </div>
-                   <div
-                     className={cn(
+                    <div
+                      data-insertion-surface="code"
+                      className={cn(
                        'overflow-hidden rounded-md border border-border bg-slate-950 shadow-inner transition-colors',
                        isCodeDropTarget && 'border-accent ring-2 ring-accent/30'
                      )}

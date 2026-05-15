@@ -183,6 +183,7 @@ export interface Strategy {
   /** Maps fromCell index → transition rules that fire after that cell */
   transitions: Record<number, TransitionRule[]>
   governance?: GovernanceConfig
+  session?: StrategySessionState
   createdAt: number
   updatedAt: number
 }
@@ -426,6 +427,28 @@ export interface BacktestPosition {
   entryDate: Date
 }
 
+export type BacktestOrderAction = 'buy' | 'sell'
+
+export interface BacktestOrder {
+  id?: string
+  symbol: string
+  action: BacktestOrderAction
+  shares?: number
+  targetWeight?: number
+  targetValue?: number
+  reason?: string
+}
+
+export type BacktestSignal =
+  | { action: 'hold'; reason?: string; [key: string]: any }
+  | ({ action: BacktestOrderAction; symbol: string; shares?: number; reason?: string; [key: string]: any })
+  | { orders: BacktestOrder[]; reason?: string; [key: string]: any }
+  | { targetAllocation: Record<string, number>; reason?: string; [key: string]: any }
+  | { target_allocation: Record<string, number>; rebalance_reason?: string; reason?: string; [key: string]: any }
+  | BacktestOrder[]
+  | null
+  | undefined
+
 export interface BacktestTrade {
   date: Date
   symbol: string
@@ -436,6 +459,29 @@ export interface BacktestTrade {
   slippage: number
   commission: number
   reason: string
+  orderId?: string
+}
+
+export interface BacktestOrderEvent {
+  id: string
+  date: Date
+  symbol?: string
+  action: BacktestOrderAction | 'hold' | 'target_allocation'
+  requestedShares?: number
+  filledShares?: number
+  targetWeight?: number
+  targetValue?: number
+  status: 'filled' | 'partial' | 'skipped'
+  reason: string
+  diagnosticId?: string
+}
+
+export interface BacktestPositionSnapshot {
+  date: Date
+  cash: number
+  portfolioValue: number
+  positions: Record<string, number>
+  weights: Record<string, number>
 }
 
 export interface BacktestMetrics {
@@ -457,6 +503,22 @@ export interface BacktestResult {
   metrics: BacktestMetrics
   positions: BacktestPosition[]
   diagnostics?: BacktestDiagnostic[]
+  normalizedFieldMap?: Record<string, string[]>
+  inputDiagnostics?: BacktestDiagnostic[]
+  orderEvents?: BacktestOrderEvent[]
+  positionSnapshots?: BacktestPositionSnapshot[]
+}
+
+export interface StrategySessionState {
+  templateId?: string
+  templateCategory?: string
+  datasetId?: string
+  datasetName?: string
+  datasetFingerprint?: DatasetFingerprint
+  backtestCode?: string
+  activeRunId?: string
+  lastRunSignature?: string
+  updatedAt?: number
 }
 
 export interface BacktestRunRecord {
@@ -469,6 +531,12 @@ export interface BacktestRunRecord {
   datasetId?: string
   datasetName: string
   datasetFingerprint: DatasetFingerprint
+  normalizedFieldMap?: Record<string, string[]>
+  inputDiagnostics?: BacktestDiagnostic[]
+  orderEvents?: BacktestOrderEvent[]
+  positionSnapshots?: BacktestPositionSnapshot[]
+  runSignature?: string
+  strategyVersion?: number
   result: BacktestResult
   diagnostics: BacktestDiagnostic[]
   freshness: 'current' | 'stale'

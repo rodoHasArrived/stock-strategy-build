@@ -17,12 +17,17 @@ interface TemplateGalleryProps {
 export function TemplateGallery({ onLoadTemplate }: TemplateGalleryProps) {
   const [open, setOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(strategyTemplates[0]?.id ?? '')
   const categories = getAllCategories()
   const datasets = fixtureStrategyDataProvider.listDatasets()
 
   const filteredTemplates = selectedCategory === 'all' 
     ? strategyTemplates 
     : strategyTemplates.filter(t => t.category === selectedCategory)
+  const selectedTemplate = filteredTemplates.find(template => template.id === selectedTemplateId) ?? filteredTemplates[0]
+  const selectedDataset = selectedTemplate
+    ? datasets.find(dataset => dataset.compatibleTemplateCategories.includes(selectedTemplate.category))
+    : undefined
 
   const handleLoadTemplate = (template: StrategyTemplate) => {
     onLoadTemplate(template)
@@ -52,14 +57,14 @@ export function TemplateGallery({ onLoadTemplate }: TemplateGalleryProps) {
           Load Template
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <ChartLine size={24} weight="duotone" className="text-accent" />
             Strategy Templates
           </DialogTitle>
           <DialogDescription>
-            Load a pre-built strategy template to get started quickly. All templates are fully editable after creation.
+            Browse templates by intent, confirm dataset fit, then load one editable strategy into the workstation.
           </DialogDescription>
         </DialogHeader>
 
@@ -78,88 +83,133 @@ export function TemplateGallery({ onLoadTemplate }: TemplateGalleryProps) {
           </TabsList>
 
           <TabsContent value={selectedCategory} className="flex-1 mt-4">
-            <ScrollArea className="h-[calc(85vh-200px)]">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-4">
-                {filteredTemplates.map((template) => {
-                  const compatibleDatasets = datasets.filter(dataset =>
-                    dataset.compatibleTemplateCategories.includes(template.category)
-                  )
-                  const recommendedDataset = compatibleDatasets[0]
-                  const isBacktestReady = Boolean(recommendedDataset)
+            {filteredTemplates.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <ChartBar size={48} className="mx-auto mb-4 opacity-20" />
+                <p>No templates found in this category</p>
+              </div>
+            ) : (
+              <div className="grid min-h-[520px] grid-cols-1 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+                <Card className="overflow-hidden">
+                  <CardHeader className="border-b pb-3">
+                    <CardTitle className="text-base">Template Workbench</CardTitle>
+                    <CardDescription>Select one template to inspect before loading.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <ScrollArea className="h-[430px]">
+                      <div className="space-y-2 p-3">
+                        {filteredTemplates.map(template => {
+                          const recommendedDataset = datasets.find(dataset =>
+                            dataset.compatibleTemplateCategories.includes(template.category)
+                          )
+                          const selected = selectedTemplate?.id === template.id
 
-                  return (
-                    <Card key={template.id} className="hover:border-accent transition-all hover:shadow-sm">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1">
-                            <CardTitle className="text-base flex items-center gap-2 mb-2">
-                              {getCategoryIcon(template.category)}
-                              {template.name}
-                            </CardTitle>
-                            <div className="flex flex-wrap gap-1.5">
-                              <Badge variant="secondary" className="text-xs">
-                                {template.category}
-                              </Badge>
-                              <Badge variant={isBacktestReady ? 'default' : 'outline'} className="text-xs">
-                                {isBacktestReady ? 'Backtest-ready' : 'Notebook only'}
-                              </Badge>
-                            </div>
-                          </div>
+                          return (
+                            <button
+                              key={template.id}
+                              type="button"
+                              className={`w-full rounded-md border p-3 text-left transition-colors hover:border-accent ${selected ? 'border-accent bg-accent/5' : 'bg-background'}`}
+                              onClick={() => setSelectedTemplateId(template.id)}
+                            >
+                              <div className="flex items-start gap-2">
+                                <span className="mt-0.5 text-accent">{getCategoryIcon(template.category)}</span>
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-medium leading-snug">{template.name}</span>
+                                  <span className="mt-1 block truncate text-xs text-muted-foreground">{template.description}</span>
+                                </span>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-1.5">
+                                <Badge variant="secondary" className="text-[10px]">{template.category}</Badge>
+                                <Badge variant={recommendedDataset ? 'default' : 'outline'} className="text-[10px]">
+                                  {recommendedDataset ? 'Backtest-ready' : 'Needs data'}
+                                </Badge>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+
+                {selectedTemplate && (
+                  <Card className="overflow-hidden">
+                    <CardHeader className="border-b">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div className="space-y-2">
+                          <CardTitle className="flex items-center gap-2 text-xl">
+                            {getCategoryIcon(selectedTemplate.category)}
+                            {selectedTemplate.name}
+                          </CardTitle>
+                          <CardDescription>{selectedTemplate.description}</CardDescription>
                         </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <CardDescription className="text-sm line-clamp-2">
-                          {template.description}
-                        </CardDescription>
-
-                        <div className="grid grid-cols-2 gap-3 text-xs">
-                          <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                            <span className="text-muted-foreground">Cells</span>
-                            <span className="font-mono font-semibold">{template.strategy.cells.length}</span>
-                          </div>
-                          <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                            <span className="text-muted-foreground">Parameters</span>
-                            <span className="font-mono font-semibold">{template.strategy.parameters.length}</span>
-                          </div>
-                        </div>
-
-                        <div className="rounded-md border bg-muted/30 p-3 text-xs">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-muted-foreground">Expected dataset</span>
-                            <span className="font-medium">{recommendedDataset?.category ?? 'Custom data'}</span>
-                          </div>
-                          <div className="mt-1 flex items-center justify-between gap-3">
-                            <span className="text-muted-foreground">Recommendation</span>
-                            <span className="truncate font-medium">{recommendedDataset?.name ?? 'Attach a fixture before proof'}</span>
-                          </div>
-                          {recommendedDataset && (
-                            <div className="mt-2 font-mono text-[11px] text-muted-foreground">
-                              {recommendedDataset.symbols.join(', ')}
-                            </div>
-                          )}
-                        </div>
-
-                        <Button
-                          onClick={() => handleLoadTemplate(template)}
-                          className="w-full gap-2"
-                          size="sm"
-                        >
+                        <Button onClick={() => handleLoadTemplate(selectedTemplate)} className="gap-2">
                           <CheckCircle size={16} weight="fill" />
                           Load Strategy
                         </Button>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4 p-4">
+                      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                        <div className="rounded-md border bg-muted/30 p-3">
+                          <div className="text-xs uppercase text-muted-foreground">Category</div>
+                          <div className="mt-1 font-medium">{selectedTemplate.category}</div>
+                        </div>
+                        <div className="rounded-md border bg-muted/30 p-3">
+                          <div className="text-xs uppercase text-muted-foreground">Cells</div>
+                          <div className="mt-1 font-mono text-lg">{selectedTemplate.strategy.cells.length}</div>
+                        </div>
+                        <div className="rounded-md border bg-muted/30 p-3">
+                          <div className="text-xs uppercase text-muted-foreground">Parameters</div>
+                          <div className="mt-1 font-mono text-lg">{selectedTemplate.strategy.parameters.length}</div>
+                        </div>
+                        <div className="rounded-md border bg-muted/30 p-3">
+                          <div className="text-xs uppercase text-muted-foreground">Signal Contract</div>
+                          <div className="mt-1 font-medium">{selectedTemplate.category === 'Portfolio' ? 'Target/Orders' : 'Buy/Sell/Hold'}</div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-md border bg-background p-4">
+                        <div className="mb-2 text-sm font-medium">Dataset Fit</div>
+                        {selectedDataset ? (
+                          <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
+                            <div>
+                              <div className="text-xs uppercase text-muted-foreground">Recommended</div>
+                              <div className="mt-1 font-medium">{selectedDataset.name}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs uppercase text-muted-foreground">Universe</div>
+                              <div className="mt-1 font-mono text-xs">{selectedDataset.symbols.join(', ')}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs uppercase text-muted-foreground">Window</div>
+                              <div className="mt-1">{selectedDataset.startDate} to {selectedDataset.endDate}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">No bundled dataset matches this template. Load the strategy, then import a custom CSV/JSON dataset before proofing.</div>
+                        )}
+                      </div>
+
+                      <div className="rounded-md border bg-muted/20 p-4">
+                        <div className="mb-3 text-sm font-medium">Workflow Preview</div>
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                          {selectedTemplate.strategy.cells.slice(0, 6).map(cell => (
+                            <div key={`${selectedTemplate.id}-${cell.index}`} className="rounded-md border bg-card p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-medium">{cell.label ?? `Cell ${cell.index}`}</span>
+                                <Badge variant="outline" className="text-[10px]">{cell.purpose}</Badge>
+                              </div>
+                              <div className="mt-2 line-clamp-2 font-mono text-[11px] text-muted-foreground">{cell.code}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
-              
-              {filteredTemplates.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <ChartBar size={48} className="mx-auto mb-4 opacity-20" />
-                  <p>No templates found in this category</p>
-                </div>
-              )}
-            </ScrollArea>
+            )}
           </TabsContent>
         </Tabs>
       </DialogContent>

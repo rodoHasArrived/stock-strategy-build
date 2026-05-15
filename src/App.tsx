@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CodeCell, Parameter, RunTraceEntry, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate, BacktestConfig, BacktestResult, TransitionRule, GovernanceConfig, BacktestRunRecord, StrategyVersionRecord, CellPurpose } from '@/lib/types'
+import { CodeCell, Parameter, RunTraceEntry, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate, BacktestConfig, BacktestResult, TransitionRule, GovernanceConfig, BacktestRunRecord, StrategyVersionRecord, CellPurpose, CellMode, StrategyDataset, StrategySessionState } from '@/lib/types'
 import { CodeCellComponent } from '@/components/CodeCellComponent'
 import { ParameterPanel } from '@/components/ParameterPanel'
 import { ContextInspector } from '@/components/ContextInspector'
@@ -33,19 +33,28 @@ import { FloppyDisk, Code, PlayCircle, FlowArrow, Database, Calculator, SidebarS
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { BacktestEngine } from '@/lib/backtestEngine'
-import { DataFrame, readJSON, toDatetime, toNumeric } from '@/lib/dataFrame'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { cn } from '@/lib/utils'
 import { saveStrategyExternal, saveRunLog, downloadJSON, listStrategyVersionRecords, saveStrategyVersionRecord } from '@/lib/persistence'
 import { buildDesignPreview, buildStrategyChecklist, createPurposeCell } from '@/lib/strategyDesign'
+import { normalizeBacktestDataFiles } from '@/lib/backtestData'
+import { createBacktestStrategyExecutor } from '@/lib/strategyExecutionAdapter'
 
 type ActiveInsertionTarget = {
-  cellIndex: number
-  mode: 'visual' | 'formula' | 'code'
+  cellId: string | null
+  mode: CellMode
+}
+
+const createCellId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `cell-${crypto.randomUUID()}`
+  }
+
+  return `cell-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 const createDefaultCell = (index: number, code: string = ''): CodeCell => ({
-  id: `cell-${index}`,
+  id: createCellId(),
   index,
   code,
   output: '',
@@ -80,8 +89,19 @@ const getFieldInsertSeparator = (code: string, mode: ActiveInsertionTarget['mode
   return ' '
 }
 
+const reindexCells = (cells: CodeCell[]) => cells.map((cell, index) => ({
+  ...cell,
+  id: cell.id || createCellId(),
+  index
+}))
+
 function App() {
-  const [strategy, setStrategy] = useKV<Strategy>('current-strategy', createDefaultStrategy())
+  const defaultStrategyRef = useRef<Strategy | null>(null)
+  if (!defaultStrategyRef.current) {
+    defaultStrategyRef.current = createDefaultStrategy()
+  }
+
+  const [strategy, setStrategy] = useKV<Strategy>('current-strategy', defaultStrategyRef.current)
   const [currentUser, setCurrentUser] = useState<{ login: string; avatarUrl: string } | undefined>(undefined)
   const [runTrace, setRunTrace] = useState<RunTraceEntry[]>([])
   const [currentBacktestRun, setCurrentBacktestRun] = useState<BacktestRunRecord | null>(null)
@@ -97,15 +117,27 @@ function App() {
   })
 
   const [highlightedCell, setHighlightedCell] = useState<number | undefined>(undefined)
-  const [activeTab, setActiveTab] = useState<string>('backtest')
+  const [activeTab, setActiveTab] = useState<string>('cells')
   const [leftPanelTab, setLeftPanelTab] = useState<'data' | 'tools'>('data')
   const [rightPanelTab, setRightPanelTab] = useState<'inspector' | 'trace' | 'checklist' | 'governance'>('inspector')
   /** 'notebook' = cells only, 'map' = flow only, 'split' = side-by-side, 'blueprint' = purpose-first */
-  const [viewMode, setViewMode] = useState<'notebook' | 'map' | 'split' | 'blueprint'>('notebook')
-  const [activeInsertionTarget, setActiveInsertionTarget] = useState<ActiveInsertionTarget>({
-    cellIndex: 0,
+  const [viewMode, setViewMode] = useState<'notebook' | 'map' | 'split' | 'blueprint'>('blueprint')
+  const [activeInsertionTarget, setActiveInsertionTarget] = useState<ActiveInsertionTarget>(() => ({
+    cellId: defaultStrategyRef.current?.cells[0]?.id ?? null,
     mode: 'formula'
-  })
+  }))
+  const activeInsertionTargetRef = useRef(activeInsertionTarget)
+
+  const commitActiveInsertionTarget = useCallback((
+    next: ActiveInsertionTarget | ((current: ActiveInsertionTarget) => ActiveInsertionTarget)
+  ) => {
+    const resolved = typeof next === 'function'
+      ? next(activeInsertionTargetRef.current)
+      : next
+
+    activeInsertionTargetRef.current = resolved
+    setActiveInsertionTarget(resolved)
+  }, [])
   
   const [constraints, setConstraints] = useKV<PortfolioConstraint[]>('portfolio-constraints', [])
   const [optimizationConfig, setOptimizationConfig] = useKV<OptimizationConfig>('optimization-config', {
@@ -114,6 +146,7 @@ function App() {
     enabled: true
   })
   const [cellComments, setCellComments] = useKV<CellComment[]>('cell-comments', [])
+  const [activeBacktestDataset, setActiveBacktestDataset] = useState<StrategyDataset | null>(null)
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -168,11 +201,7 @@ function App() {
         return createDefaultStrategy()
       }
       const newCells = current.cells.filter((_, i) => i !== index)
-      const reindexedCells = newCells.map((cell, i) => ({
-        ...cell,
-        id: `cell-${i}`,
-        index: i
-      }))
+      const reindexedCells = reindexCells(newCells)
       return {
         ...current,
         cells: reindexedCells.length > 0 ? reindexedCells : [createDefaultCell(0)],
@@ -191,6 +220,7 @@ function App() {
       // Insert duplicate immediately after the source cell
       const duplicate: CodeCell = {
         ...source,
+        id: createCellId(),
         status: 'idle',
         output: '',
         error: undefined,
@@ -200,7 +230,7 @@ function App() {
         label: source.label ? `${source.label} (copy)` : undefined
       }
       newCells.splice(index + 1, 0, duplicate)
-      const reindexedCells = newCells.map((cell, i) => ({ ...cell, index: i, id: `cell-${i}` }))
+      const reindexedCells = reindexCells(newCells)
       return {
         ...current,
         cells: reindexedCells,
@@ -217,7 +247,7 @@ function App() {
       }
       const cellWithIndex: CodeCell = {
         ...newCell,
-        id: `cell-${current.cells.length}`,
+        id: newCell.id || createCellId(),
         index: current.cells.length,
       }
       return {
@@ -433,68 +463,104 @@ function App() {
       }
 
   useEffect(() => {
-    if (activeInsertionTarget.cellIndex < safeStrategy.cells.length) return
+    if (safeStrategy.cells.length === 0) return
 
-    setActiveInsertionTarget((current) => ({
+    const targetExists = safeStrategy.cells.some((cell) => cell.id === activeInsertionTarget.cellId)
+    if (targetExists) return
+
+    commitActiveInsertionTarget((current) => ({
       ...current,
-      cellIndex: Math.max(0, safeStrategy.cells.length - 1)
+      cellId: safeStrategy.cells[0]?.id ?? null
     }))
-  }, [safeStrategy.cells.length])
+  }, [activeInsertionTarget.cellId, commitActiveInsertionTarget, safeStrategy.cells])
 
   const handleFieldSelect = (field: AMXDataField) => {
     const fieldReference = `${field.function}(cusip)`
-    const targetCell = safeStrategy.cells[activeInsertionTarget.cellIndex]
+    const targetSnapshot = activeInsertionTargetRef.current
+    const renderedTargetIndex = targetSnapshot.cellId
+      ? safeStrategy.cells.findIndex((cell) => cell.id === targetSnapshot.cellId)
+      : -1
+    const renderedTargetCell = renderedTargetIndex >= 0 ? safeStrategy.cells[renderedTargetIndex] : undefined
 
-    if (!targetCell) {
+    if (!renderedTargetCell) {
       toast.info('Select a cell to choose where fields should be inserted.')
       return
     }
 
-    const nextCells = [...safeStrategy.cells]
-
-    if (activeInsertionTarget.mode === 'visual') {
-      const existingFields = targetCell.visualConfig?.dataFields || []
+    if (targetSnapshot.mode === 'visual') {
+      const existingFields = renderedTargetCell.visualConfig?.dataFields || []
       const alreadySelected = existingFields.includes(field.function)
-      nextCells[activeInsertionTarget.cellIndex] = {
-        ...targetCell,
-        visualConfig: {
-          ...targetCell.visualConfig,
-          dataFields: alreadySelected ? existingFields : [...existingFields, field.function]
+
+      toast[alreadySelected ? 'info' : 'success'](
+        alreadySelected
+          ? `${field.name} is already selected in cell ${renderedTargetCell.index}`
+          : `${field.name} added to cell ${renderedTargetCell.index}`
+      )
+    } else {
+      toast.success(`${field.name} inserted into cell ${renderedTargetCell.index}`)
+    }
+
+    setStrategy((current) => {
+      if (!current || !Array.isArray(current.cells)) {
+        return createDefaultStrategy()
+      }
+
+      if (!targetSnapshot.cellId) return current
+
+      const targetIndex = current.cells.findIndex((cell) => cell.id === targetSnapshot.cellId)
+      const targetCell = targetIndex >= 0 ? current.cells[targetIndex] : undefined
+      if (!targetCell) return current
+
+      if (targetSnapshot.mode === 'visual') {
+        const existingFields = targetCell.visualConfig?.dataFields || []
+        if (existingFields.includes(field.function)) {
+          return current
+        }
+
+        const nextCells = [...current.cells]
+        nextCells[targetIndex] = {
+          ...targetCell,
+          visualConfig: {
+            ...targetCell.visualConfig,
+            dataFields: [...existingFields, field.function]
+          }
+        }
+
+        return {
+          ...current,
+          cells: nextCells,
+          updatedAt: Date.now()
         }
       }
 
-      toast.success(
-        alreadySelected
-          ? `${field.name} is already selected in cell ${targetCell.index}`
-          : `${field.name} added to cell ${targetCell.index}`
-      )
-    } else {
-      nextCells[activeInsertionTarget.cellIndex] = {
+      const nextCells = [...current.cells]
+      nextCells[targetIndex] = {
         ...targetCell,
-        code: `${targetCell.code}${getFieldInsertSeparator(targetCell.code, activeInsertionTarget.mode)}${fieldReference}`
+        code: `${targetCell.code}${getFieldInsertSeparator(targetCell.code, targetSnapshot.mode)}${fieldReference}`
       }
 
-      toast.success(`${field.name} inserted into cell ${targetCell.index}`)
-    }
-
-    setStrategy({
-      ...safeStrategy,
-      cells: nextCells,
-      updatedAt: Date.now()
+      return {
+        ...current,
+        cells: nextCells,
+        updatedAt: Date.now()
+      }
     })
   }
 
-  const handleActivateCell = (cellIndex: number, mode: 'visual' | 'formula' | 'code') => {
-    const targetCell = safeStrategy.cells[cellIndex]
+  const handleActivateCell = (cellId: string, mode: CellMode) => {
+    const targetCell = safeStrategy.cells.find((cell) => cell.id === cellId)
     if (!targetCell) return
 
-    setActiveInsertionTarget({
-      cellIndex,
+    commitActiveInsertionTarget({
+      cellId,
       mode
     })
   }
 
-  const activeInsertionCell = safeStrategy.cells[activeInsertionTarget.cellIndex]
+  const activeInsertionIndex = activeInsertionTarget.cellId
+    ? safeStrategy.cells.findIndex((cell) => cell.id === activeInsertionTarget.cellId)
+    : -1
+  const activeInsertionCell = activeInsertionIndex >= 0 ? safeStrategy.cells[activeInsertionIndex] : undefined
   const activeCatalogSelection = activeInsertionTarget.mode === 'visual'
     ? activeInsertionCell?.visualConfig?.dataFields || []
     : []
@@ -611,10 +677,15 @@ function App() {
       id: `strategy-${Date.now()}`,
       name: template.name,
       description: template.description,
-      cells: template.strategy.cells,
+      cells: reindexCells(template.strategy.cells.map(cell => ({ ...cell, id: createCellId() }))),
       parameters: template.strategy.parameters,
       transitions: template.strategy.transitions || {},
       governance: template.strategy.governance || createDefaultGovernance(),
+      session: {
+        templateId: template.id,
+        templateCategory: template.category,
+        updatedAt: Date.now(),
+      },
       createdAt: Date.now(),
       updatedAt: Date.now()
     }
@@ -626,7 +697,13 @@ function App() {
   }
 
   const handleCreateStrategyFromWizard = (nextStrategy: Strategy) => {
-    setStrategy(nextStrategy)
+    setStrategy({
+      ...nextStrategy,
+      session: {
+        ...(nextStrategy.session ?? {}),
+        updatedAt: Date.now(),
+      },
+    })
     setSelectedTemplateCategory(undefined)
     setCurrentBacktestRun(null)
     setIsBacktestProofStale(false)
@@ -636,6 +713,28 @@ function App() {
     setRightPanelTab('checklist')
     toast.success(`Created strategy: ${nextStrategy.name}`)
   }
+
+  const handleBacktestSessionChange = useCallback((updates: Partial<StrategySessionState>) => {
+    setStrategy((current) => {
+      if (!current) return createDefaultStrategy()
+      const currentSession = current.session ?? {}
+      const hasChanges = Object.entries(updates).some(([key, value]) =>
+        currentSession[key as keyof StrategySessionState] !== value
+      )
+
+      if (!hasChanges) return current
+
+      return {
+        ...current,
+        session: {
+          ...currentSession,
+          ...updates,
+          updatedAt: Date.now(),
+        },
+        updatedAt: Date.now(),
+      }
+    })
+  }, [setStrategy])
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return
@@ -654,11 +753,7 @@ function App() {
       const [removed] = newCells.splice(sourceIndex, 1)
       newCells.splice(destIndex, 0, removed)
 
-      const reindexedCells = newCells.map((cell, i) => ({
-        ...cell,
-        id: `cell-${i}`,
-        index: i
-      }))
+      const reindexedCells = reindexCells(newCells)
 
       return {
         ...current,
@@ -670,42 +765,49 @@ function App() {
     toast.info(`Cell moved from position ${sourceIndex} to ${destIndex}`)
   }
 
-  const handleBacktestRun = async (
+  const handleBacktestRun = useCallback(async (
     config: BacktestConfig,
     strategyCode: string,
-    dataFiles: Record<string, any>
+    dataFiles: Record<string, any>,
+    dataset?: StrategyDataset | null
   ): Promise<BacktestResult> => {
     const engine = new BacktestEngine(config)
+    const normalized = normalizeBacktestDataFiles(dataFiles, dataset)
 
-    Object.entries(dataFiles).forEach(([symbol, data]) => {
-      const df = readJSON(data)
-      const dateCol = df.columns.includes('SessionDate') ? 'SessionDate' : 'Date'
-      const dates = toDatetime(df.getColumn(dateCol))
-      const closes = toNumeric(df.getColumn('Close'))
-      const volumes = toNumeric(df.getColumn('Volume'))
-
-      const timeSeriesData = dates.map((date, i) => ({
-        date,
-        close: closes[i],
-        volume: volumes[i]
-      }))
-
-      engine.loadTimeSeries(symbol, timeSeriesData)
+    Object.entries(normalized.seriesBySymbol).forEach(([symbol, rows]) => {
+      engine.loadTimeSeries(symbol, rows)
     })
 
-    const strategyFn = new Function('df', 'state', 'DataFrame', 'readJSON', 'toDatetime', 'toNumeric', strategyCode)
+    const blockingDiagnostics = normalized.diagnostics.filter(diagnostic => diagnostic.severity === 'error')
+    if (blockingDiagnostics.length > 0 && Object.values(normalized.seriesBySymbol).every(rows => rows.length === 0)) {
+      throw new Error(blockingDiagnostics.map(diagnostic => diagnostic.message).join('\n'))
+    }
 
-    const result = await engine.runBacktest((df, state) => {
-      return strategyFn(df, state, DataFrame, readJSON, toDatetime, toNumeric)
-    })
+    const strategyFn = createBacktestStrategyExecutor(strategyCode)
+    const result = await engine.runBacktest(strategyFn)
 
-    return result
-  }
+    return {
+      ...result,
+      diagnostics: [...normalized.diagnostics, ...(result.diagnostics ?? [])],
+      inputDiagnostics: normalized.diagnostics,
+      normalizedFieldMap: normalized.normalizedFieldMap,
+    }
+  }, [])
 
-  const handleBacktestRunRecordChange = (record: BacktestRunRecord | null, isStale: boolean) => {
+  const handleBacktestRunRecordChange = useCallback((record: BacktestRunRecord | null, isStale: boolean) => {
     setCurrentBacktestRun(record)
     setIsBacktestProofStale(isStale)
-  }
+    if (record) {
+      handleBacktestSessionChange({
+        activeRunId: record.id,
+        datasetId: record.datasetId,
+        datasetName: record.datasetName,
+        datasetFingerprint: record.datasetFingerprint,
+        backtestCode: record.strategyCode,
+        lastRunSignature: record.runSignature,
+      })
+    }
+  }, [handleBacktestSessionChange])
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -899,11 +1001,11 @@ function App() {
                       <TabsList className="h-10">
                         <TabsTrigger value="cells" className="gap-2 text-sm" onClick={() => viewMode === 'map' && setViewMode('notebook')}>
                           <Code size={16} />
-                          Code Cells
+                          Build Strategy
                         </TabsTrigger>
                         <TabsTrigger value="backtest" className="gap-2 text-sm">
                           <ChartLine size={16} />
-                          Backtest
+                          Run Proof
                         </TabsTrigger>
                       </TabsList>
                     </Tabs>
@@ -974,7 +1076,11 @@ function App() {
                           onRun={handleBacktestRun}
                           strategyId={safeStrategy.id}
                           strategyName={safeStrategy.name}
+                          strategyVersion={safeStrategy.governance?.version}
+                          session={safeStrategy.session}
                           templateCategory={selectedTemplateCategory}
+                          onDatasetChange={setActiveBacktestDataset}
+                          onSessionChange={handleBacktestSessionChange}
                           onRunRecordChange={handleBacktestRunRecordChange}
                         />
                       </ScrollArea>
@@ -1030,9 +1136,9 @@ function App() {
                                                   onResolveComment={handleResolveComment}
                                                   currentUser={currentUser}
                                                   dragHandleProps={provided.dragHandleProps}
-                                                  onActivate={(mode) => handleActivateCell(cell.index, mode)}
-                                                  isActive={activeInsertionTarget.cellIndex === cell.index}
-                                                  designPreview={buildDesignPreview(cell, safeStrategy.cells.slice(0, index))}
+                                                  onActivate={(mode) => handleActivateCell(cell.id, mode)}
+                                                  isActive={activeInsertionTarget.cellId === cell.id}
+                                                  designPreview={buildDesignPreview(cell, safeStrategy.cells.slice(0, index), activeBacktestDataset)}
                                                 />
                                               </div>
 

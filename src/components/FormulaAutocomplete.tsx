@@ -282,7 +282,8 @@ export function FormulaAutocomplete({
     const textarea = textareaRef.current
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
-    const nextValue = `${value.slice(0, start)}${text}${value.slice(end)}`
+    const currentValue = textarea.value
+    const nextValue = `${currentValue.slice(0, start)}${text}${currentValue.slice(end)}`
     const nextPosition = start + text.length
 
     commitInsertion(nextValue, nextPosition)
@@ -347,6 +348,7 @@ export function FormulaAutocomplete({
     <div className="relative">
       <Textarea
         ref={textareaRef}
+        data-insertion-surface="formula"
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}

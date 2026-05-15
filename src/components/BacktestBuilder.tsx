@@ -36,6 +36,7 @@ import {
   BacktestRunRecord,
   BacktestResult,
   StrategyDataset,
+  StrategySessionState,
 } from '@/lib/types'
 import { toast } from 'sonner'
 import { EquityCurveChart } from '@/components/EquityCurveChart'
@@ -45,10 +46,14 @@ import { fixtureStrategyDataProvider } from '@/lib/strategyDataProvider'
 import { downloadJSON, listBacktestRunRecords, saveBacktestRunRecord } from '@/lib/persistence'
 
 interface BacktestBuilderProps {
-  onRun: (config: BacktestConfig, strategyCode: string, dataFiles: Record<string, any>) => Promise<BacktestResult>
+  onRun: (config: BacktestConfig, strategyCode: string, dataFiles: Record<string, any>, dataset?: StrategyDataset | null) => Promise<BacktestResult>
   strategyId?: string
   strategyName?: string
+  strategyVersion?: number
+  session?: StrategySessionState
   templateCategory?: string
+  onDatasetChange?: (dataset: StrategyDataset | null) => void
+  onSessionChange?: (updates: Partial<StrategySessionState>) => void
   onRunRecordChange?: (record: BacktestRunRecord | null, isStale: boolean) => void
 }
 
@@ -354,20 +359,26 @@ export function BacktestBuilder({
   onRun,
   strategyId = 'default',
   strategyName = 'New Strategy',
+  strategyVersion,
+  session,
   templateCategory,
+  onDatasetChange,
+  onSessionChange,
   onRunRecordChange,
 }: BacktestBuilderProps) {
+  const sessionDataset = session?.datasetId ? fixtureStrategyDataProvider.loadDataset(session.datasetId) : undefined
+  const initialDataset = sessionDataset ?? defaultDataset ?? null
   const [config, setConfig] = useState<BacktestConfig>({
     startCapital: 1000,
-    startDate: defaultDataset?.startDate ? new Date(defaultDataset.startDate) : undefined,
-    endDate: defaultDataset?.endDate ? new Date(defaultDataset.endDate) : undefined,
+    startDate: initialDataset?.startDate ? new Date(initialDataset.startDate) : undefined,
+    endDate: initialDataset?.endDate ? new Date(initialDataset.endDate) : undefined,
     transactionCost: 0.003,
     volumeCapPct: 0.25,
     slippageModel: 'adaptive',
   })
-  const [selectedDataset, setSelectedDataset] = useState<StrategyDataset | null>(defaultDataset ?? null)
-  const [strategyCode, setStrategyCode] = useState(defaultDataset?.strategyTemplate ?? '')
-  const [dataFiles, setDataFiles] = useState<Record<string, any>>(defaultDataset?.data ?? {})
+  const [selectedDataset, setSelectedDataset] = useState<StrategyDataset | null>(initialDataset)
+  const [strategyCode, setStrategyCode] = useState(session?.backtestCode ?? initialDataset?.strategyTemplate ?? '')
+  const [dataFiles, setDataFiles] = useState<Record<string, any>>(initialDataset?.data ?? {})
   const [result, setResult] = useState<BacktestResult | null>(null)
   const [activeRunRecord, setActiveRunRecord] = useState<BacktestRunRecord | null>(null)
   const [runHistory, setRunHistory] = useState<BacktestRunRecord[]>(() => listBacktestRunRecords())
@@ -375,7 +386,7 @@ export function BacktestBuilder({
   const [isRunning, setIsRunning] = useState(false)
   const [activeTab, setActiveTab] = useState('config')
   const [lastRunSignature, setLastRunSignature] = useState<string | null>(null)
-  const [importSymbol, setImportSymbol] = useState(defaultDataset?.symbols[0] ?? '')
+  const [importSymbol, setImportSymbol] = useState(initialDataset?.symbols[0] ?? '')
 
   const datasetAnalysis = useMemo(() => analyzeDataFiles(dataFiles), [dataFiles])
   const loadedRows = datasetAnalysis.totalRows
@@ -407,6 +418,10 @@ export function BacktestBuilder({
     onRunRecordChange?.(activeRunRecord, resultIsStale)
   }, [activeRunRecord, resultIsStale, onRunRecordChange])
 
+  useEffect(() => {
+    onDatasetChange?.(selectedDataset)
+  }, [selectedDataset, onDatasetChange])
+
   const updateConfig = (updates: Partial<BacktestConfig>) => {
     setConfig(current => ({ ...current, ...updates }))
   }
@@ -423,6 +438,12 @@ export function BacktestBuilder({
       endDate: nextDataset.endDate ? new Date(nextDataset.endDate) : undefined,
     }))
     setImportSymbol(nextDataset.symbols[0] ?? '')
+    onSessionChange?.({
+      datasetId: nextDataset.id,
+      datasetName: nextDataset.name,
+      datasetFingerprint: nextDataset.fingerprint,
+      backtestCode: nextDataset.strategyTemplate,
+    })
     toast.success(`Loaded ${nextDataset.name}`)
   }
 
@@ -441,8 +462,20 @@ export function BacktestBuilder({
       endDate: recommendedDataset.endDate ? new Date(recommendedDataset.endDate) : undefined,
     }))
     setImportSymbol(recommendedDataset.symbols[0] ?? '')
+    onSessionChange?.({
+      templateCategory,
+      datasetId: recommendedDataset.id,
+      datasetName: recommendedDataset.name,
+      datasetFingerprint: recommendedDataset.fingerprint,
+      backtestCode: recommendedDataset.strategyTemplate,
+    })
     toast.info(`Recommended ${recommendedDataset.name} for ${templateCategory}`)
   }, [templateCategory])
+
+  const handleStrategyCodeChange = (code: string) => {
+    setStrategyCode(code)
+    onSessionChange?.({ backtestCode: code })
+  }
 
   const handleFileUpload = async (symbol: string, file: File) => {
     try {
@@ -462,6 +495,11 @@ export function BacktestBuilder({
         endDate: nextDataset.endDate ? new Date(nextDataset.endDate) : current.endDate,
       }))
       setImportSymbol(normalizedSymbol)
+      onSessionChange?.({
+        datasetId: nextDataset.id,
+        datasetName: nextDataset.name,
+        datasetFingerprint: nextDataset.fingerprint,
+      })
       toast.success(`Imported ${normalizedSymbol} ${file.name.toLowerCase().endsWith('.csv') ? 'CSV' : 'JSON'} data`)
     } catch (error) {
       toast.error(error instanceof SyntaxError ? 'Import failed: invalid JSON or CSV structure' : `Failed to import ${symbol.trim() || 'symbol'} data`)
@@ -481,7 +519,7 @@ export function BacktestBuilder({
 
     setIsRunning(true)
     try {
-      const backtestResult = await onRun(config, strategyCode, dataFiles)
+      const backtestResult = await onRun(config, strategyCode, dataFiles, selectedDataset)
       const runDiagnostics = [...preRunDiagnostics, ...(backtestResult.diagnostics ?? [])]
       const runRecord: BacktestRunRecord = {
         id: `backtest-${Date.now()}`,
@@ -493,6 +531,12 @@ export function BacktestBuilder({
         datasetId: selectedDataset?.id,
         datasetName: selectedDataset?.name ?? 'Custom upload',
         datasetFingerprint,
+        normalizedFieldMap: backtestResult.normalizedFieldMap,
+        inputDiagnostics: backtestResult.inputDiagnostics,
+        orderEvents: backtestResult.orderEvents,
+        positionSnapshots: backtestResult.positionSnapshots,
+        runSignature,
+        strategyVersion,
         result: backtestResult,
         diagnostics: runDiagnostics,
         freshness: 'current',
@@ -505,6 +549,14 @@ export function BacktestBuilder({
       saveBacktestRunRecord(runRecord)
       setRunHistory(listBacktestRunRecords())
       setActiveTab('results')
+      onSessionChange?.({
+        activeRunId: runRecord.id,
+        datasetId: selectedDataset?.id,
+        datasetName: runRecord.datasetName,
+        datasetFingerprint,
+        backtestCode: strategyCode,
+        lastRunSignature: runSignature,
+      })
       if (notify) toast.success('Backtest complete')
     } catch (error) {
       const errorDiagnostic = createDiagnostic(
@@ -620,9 +672,9 @@ export function BacktestBuilder({
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid h-11 w-full grid-cols-4">
-          <TabsTrigger value="config">1 Define</TabsTrigger>
-          <TabsTrigger value="data">2 Data</TabsTrigger>
-          <TabsTrigger value="strategy">3 Logic</TabsTrigger>
+          <TabsTrigger value="config">1 Configure</TabsTrigger>
+          <TabsTrigger value="data">2 Validate Data</TabsTrigger>
+          <TabsTrigger value="strategy">3 Run Proof</TabsTrigger>
           <TabsTrigger value="results">4 Explain</TabsTrigger>
         </TabsList>
 
@@ -938,7 +990,7 @@ export function BacktestBuilder({
               )}
               <Textarea
                 value={strategyCode}
-                onChange={(e) => setStrategyCode(e.target.value)}
+                onChange={(e) => handleStrategyCodeChange(e.target.value)}
                 className="min-h-[400px] font-mono text-sm"
                 placeholder="Enter your strategy code..."
               />

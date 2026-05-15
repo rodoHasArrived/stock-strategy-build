@@ -18,6 +18,7 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
+    "types": [],
     /* Linting */
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
@@ -29,5 +30,8 @@
   },
   "include": [
     "src"
+  ],
+  "exclude": [
+    "src/test"
   ]
 }
