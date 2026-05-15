@@ -1,5 +1,5 @@
 import { DataFrame } from './dataFrame'
-import { BacktestConfig, BacktestResult, BacktestMetrics, BacktestTrade, TimeSeriesData } from './types'
+import { BacktestConfig, BacktestDiagnostic, BacktestResult, BacktestMetrics, BacktestTrade, TimeSeriesData } from './types'
 
 export class BacktestEngine {
   private config: BacktestConfig
@@ -114,6 +114,7 @@ export class BacktestEngine {
   async runBacktest(strategyFn: (data: DataFrame, state: any) => any): Promise<BacktestResult> {
     const equity: Array<{ date: Date; value: number; [key: string]: any }> = []
     const trades: BacktestTrade[] = []
+    const diagnostics: BacktestDiagnostic[] = []
     const positions = new Map<string, number>()
     let cash = this.config.startCapital
 
@@ -150,6 +151,32 @@ export class BacktestEngine {
 
       const signal = await strategyFn(new DataFrame([marketData]), state)
 
+      if (signal != null && typeof signal === 'object') {
+        const action = signal.action
+        if (!['buy', 'sell', 'hold'].includes(action)) {
+          diagnostics.push({
+            id: `unsupported-action-${date.getTime()}`,
+            severity: 'warning',
+            message: `Unsupported signal action "${String(action)}"; expected buy, sell, or hold.`,
+            date: date.toISOString()
+          })
+        } else if ((action === 'buy' || action === 'sell') && !signal.symbol) {
+          diagnostics.push({
+            id: `missing-symbol-${date.getTime()}`,
+            severity: 'warning',
+            message: `${action} signal ignored because it did not include a symbol.`,
+            date: date.toISOString()
+          })
+        }
+      } else if (signal != null) {
+        diagnostics.push({
+          id: `unsupported-signal-${date.getTime()}`,
+          severity: 'warning',
+          message: `Unsupported signal shape "${typeof signal}"; expected an object with action, symbol, and reason.`,
+          date: date.toISOString()
+        })
+      }
+
       if (signal?.action === 'buy' && signal?.symbol) {
         const tsData = this.timeSeriesData.get(signal.symbol)
         if (tsData) {
@@ -179,9 +206,41 @@ export class BacktestEngine {
                   commission,
                   reason: signal.reason || 'strategy_signal'
                 })
+              } else {
+                diagnostics.push({
+                  id: `insufficient-cash-${signal.symbol}-${date.getTime()}`,
+                  severity: 'info',
+                  message: `Buy signal for ${signal.symbol} skipped because total cost exceeded available cash.`,
+                  symbol: signal.symbol,
+                  date: date.toISOString()
+                })
               }
+            } else {
+              diagnostics.push({
+                id: `zero-shares-buy-${signal.symbol}-${date.getTime()}`,
+                severity: 'info',
+                message: `Buy signal for ${signal.symbol} produced zero shares after volume/cash constraints.`,
+                symbol: signal.symbol,
+                date: date.toISOString()
+              })
             }
+          } else {
+            diagnostics.push({
+              id: `missing-market-data-buy-${signal.symbol}-${date.getTime()}`,
+              severity: 'warning',
+              message: `Buy signal for ${signal.symbol} skipped because close or volume was unavailable.`,
+              symbol: signal.symbol,
+              date: date.toISOString()
+            })
           }
+        } else {
+          diagnostics.push({
+            id: `unknown-symbol-buy-${signal.symbol}-${date.getTime()}`,
+            severity: 'warning',
+            message: `Buy signal referenced unknown symbol ${signal.symbol}.`,
+            symbol: signal.symbol,
+            date: date.toISOString()
+          })
         }
       } else if (signal?.action === 'sell' && signal?.symbol) {
         const currentPos = positions.get(signal.symbol) || 0
@@ -212,9 +271,33 @@ export class BacktestEngine {
                   commission,
                   reason: signal.reason || 'strategy_signal'
                 })
+              } else {
+                diagnostics.push({
+                  id: `zero-shares-sell-${signal.symbol}-${date.getTime()}`,
+                  severity: 'info',
+                  message: `Sell signal for ${signal.symbol} produced zero shares after volume constraints.`,
+                  symbol: signal.symbol,
+                  date: date.toISOString()
+                })
               }
+            } else {
+              diagnostics.push({
+                id: `missing-market-data-sell-${signal.symbol}-${date.getTime()}`,
+                severity: 'warning',
+                message: `Sell signal for ${signal.symbol} skipped because close or volume was unavailable.`,
+                symbol: signal.symbol,
+                date: date.toISOString()
+              })
             }
           }
+        } else {
+          diagnostics.push({
+            id: `no-position-sell-${signal.symbol}-${date.getTime()}`,
+            severity: 'info',
+            message: `Sell signal for ${signal.symbol} skipped because no position was held.`,
+            symbol: signal.symbol,
+            date: date.toISOString()
+          })
         }
       }
 
@@ -249,7 +332,8 @@ export class BacktestEngine {
         shares,
         entryPrice: 0,
         entryDate: new Date()
-      }))
+      })),
+      diagnostics
     }
   }
 }

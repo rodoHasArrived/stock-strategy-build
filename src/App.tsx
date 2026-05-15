@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CodeCell, Parameter, RunTraceEntry, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate, BacktestConfig, BacktestResult, TransitionRule, GovernanceConfig } from '@/lib/types'
+import { CodeCell, Parameter, RunTraceEntry, Strategy, ExecutionContext, PortfolioConstraint, OptimizationConfig, Trade, TimeSeriesConfig, CellComment, StrategyTemplate, BacktestConfig, BacktestResult, TransitionRule, GovernanceConfig, BacktestRunRecord, StrategyVersionRecord } from '@/lib/types'
 import { CodeCellComponent } from '@/components/CodeCellComponent'
 import { ParameterPanel } from '@/components/ParameterPanel'
 import { ContextInspector } from '@/components/ContextInspector'
@@ -32,7 +32,7 @@ import { BacktestEngine } from '@/lib/backtestEngine'
 import { DataFrame, readJSON, toDatetime, toNumeric } from '@/lib/dataFrame'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { cn } from '@/lib/utils'
-import { saveStrategyExternal, saveRunLog, downloadJSON } from '@/lib/persistence'
+import { saveStrategyExternal, saveRunLog, downloadJSON, listStrategyVersionRecords, saveStrategyVersionRecord } from '@/lib/persistence'
 
 type ActiveInsertionTarget = {
   cellIndex: number
@@ -79,6 +79,10 @@ function App() {
   const [strategy, setStrategy] = useKV<Strategy>('current-strategy', createDefaultStrategy())
   const [currentUser, setCurrentUser] = useState<{ login: string; avatarUrl: string } | undefined>(undefined)
   const [runTrace, setRunTrace] = useState<RunTraceEntry[]>([])
+  const [currentBacktestRun, setCurrentBacktestRun] = useState<BacktestRunRecord | null>(null)
+  const [isBacktestProofStale, setIsBacktestProofStale] = useState(false)
+  const [versionHistory, setVersionHistory] = useState<StrategyVersionRecord[]>(() => listStrategyVersionRecords())
+  const [selectedTemplateCategory, setSelectedTemplateCategory] = useState<string | undefined>(undefined)
 
   const [executionContext, setExecutionContext] = useState<ExecutionContext>({
     variables: {},
@@ -104,38 +108,6 @@ function App() {
     constraints: [],
     enabled: true
   })
-  const [mockTrades] = useState<Trade[]>([
-    {
-      id: 'trade-1',
-      security: 'ABC 5.25 2030',
-      cusip: '12345ABC',
-      action: 'buy',
-      quantity: 1500000,
-      price: 98.75,
-      reason: 'BUY_HIGH_SCORE',
-      score: 85.3
-    },
-    {
-      id: 'trade-2',
-      security: 'XYZ 4.80 2029',
-      cusip: '67890XYZ',
-      action: 'sell',
-      quantity: 750000,
-      price: 101.20,
-      reason: 'SELL_FAILED_RATING',
-      reasonDetails: 'Rating downgraded below BBB-',
-      score: 32.1
-    },
-    {
-      id: 'trade-3',
-      security: 'DEF 6.10 2032',
-      cusip: 'DEF123456',
-      action: 'hold',
-      price: 99.10,
-      reason: 'HOLD_WITHIN_TOLERANCE',
-      score: 68.9
-    }
-  ])
   const [cellComments, setCellComments] = useKV<CellComment[]>('cell-comments', [])
 
   useEffect(() => {
@@ -382,9 +354,42 @@ function App() {
   }
 
   const handleSaveStrategy = () => {
-    // Persist strategy to external private store (localStorage) in addition to Spark KV
-    saveStrategyExternal(strategy)
-    toast.success('Strategy saved to private storage')
+    const nextVersion = (safeStrategy.governance?.version ?? 0) + 1
+    const auditEntry = {
+      id: `audit-${Date.now()}`,
+      timestamp: Date.now(),
+      actor: currentUser?.login ?? 'local-user',
+      action: `Saved local version ${nextVersion}`,
+      details: currentBacktestRun
+        ? `Linked proof ${currentBacktestRun.id}${isBacktestProofStale ? ' (stale)' : ''}`
+        : 'No linked backtest proof'
+    }
+    const versionedStrategy: Strategy = {
+      ...safeStrategy,
+      governance: {
+        ...(safeStrategy.governance ?? createDefaultGovernance()),
+        version: nextVersion,
+        auditLog: [auditEntry, ...((safeStrategy.governance ?? createDefaultGovernance()).auditLog ?? [])],
+      },
+      updatedAt: Date.now(),
+    }
+    const versionRecord: StrategyVersionRecord = {
+      id: `version-${Date.now()}`,
+      strategyId: versionedStrategy.id,
+      strategyName: versionedStrategy.name,
+      version: nextVersion,
+      label: `${versionedStrategy.name} v${nextVersion}`,
+      author: currentUser?.login ?? 'local-user',
+      timestamp: Date.now(),
+      strategy: versionedStrategy,
+      linkedRunIds: currentBacktestRun && !isBacktestProofStale ? [currentBacktestRun.id] : [],
+      audit: versionedStrategy.governance?.auditLog ?? [],
+    }
+    saveStrategyExternal(versionedStrategy)
+    saveStrategyVersionRecord(versionRecord)
+    setVersionHistory(listStrategyVersionRecords())
+    setStrategy(versionedStrategy)
+    toast.success(`Saved local version ${nextVersion}`)
   }
 
   const handleExportRunTrace = () => {
@@ -485,6 +490,18 @@ function App() {
     ? `Cell ${activeInsertionCell.index} · ${activeInsertionTarget.mode === 'visual' ? 'Visual fields' : activeInsertionTarget.mode === 'formula' ? 'Formula editor' : 'Code editor'}`
     : 'Choose a cell to insert fields'
 
+  const latestVersion = versionHistory.find(record => record.strategyId === safeStrategy.id)
+  const derivedTrades: Trade[] = currentBacktestRun?.result.trades.map((trade, index) => ({
+    id: `backtest-trade-${index}`,
+    security: trade.symbol,
+    cusip: trade.symbol,
+    action: trade.action,
+    quantity: trade.shares,
+    price: trade.executionPrice,
+    reason: 'REBALANCE',
+    reasonDetails: trade.reason,
+  })) ?? []
+
   const renderInsertionTargetHint = () => (
     <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3">
       <div className="text-sm font-medium text-foreground">Insert target</div>
@@ -563,6 +580,9 @@ function App() {
       updatedAt: Date.now()
     }
     setStrategy(loadedStrategy)
+    setSelectedTemplateCategory(template.category)
+    setCurrentBacktestRun(null)
+    setIsBacktestProofStale(false)
     toast.success(`Loaded template: ${template.name}`)
   }
 
@@ -629,6 +649,11 @@ function App() {
     })
 
     return result
+  }
+
+  const handleBacktestRunRecordChange = (record: BacktestRunRecord | null, isStale: boolean) => {
+    setCurrentBacktestRun(record)
+    setIsBacktestProofStale(isStale)
   }
 
   return (
@@ -715,7 +740,7 @@ function App() {
                   </AccordionTrigger>
                   <AccordionContent>
                     <TradeList 
-                      trades={mockTrades}
+                      trades={derivedTrades}
                       onExport={() => toast.success('Trade list exported')}
                     />
                   </AccordionContent>
@@ -883,7 +908,13 @@ function App() {
 
                     <TabsContent value="backtest" className="flex-1 min-h-0 mt-0">
                       <ScrollArea className="h-full">
-                        <BacktestBuilder onRun={handleBacktestRun} />
+                        <BacktestBuilder
+                          onRun={handleBacktestRun}
+                          strategyId={safeStrategy.id}
+                          strategyName={safeStrategy.name}
+                          templateCategory={selectedTemplateCategory}
+                          onRunRecordChange={handleBacktestRunRecordChange}
+                        />
                       </ScrollArea>
                     </TabsContent>
 
@@ -1074,6 +1105,9 @@ function App() {
                             governance={safeStrategy.governance ?? createDefaultGovernance()}
                             onGovernanceChange={handleGovernanceChange}
                             currentUser={currentUser?.login}
+                            currentRunRecord={currentBacktestRun}
+                            proofIsStale={isBacktestProofStale}
+                            latestVersion={latestVersion}
                           />
                         </div>
                       </ScrollArea>

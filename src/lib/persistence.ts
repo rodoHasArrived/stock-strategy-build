@@ -1,3 +1,5 @@
+import type { BacktestRunRecord, StrategyVersionRecord } from './types'
+
 /**
  * External private persistence layer.
  *
@@ -10,6 +12,8 @@ const PREFIX = 'ssb:private:'
 const KEY_STRATEGY = `${PREFIX}strategy`
 const KEY_RUN_LOG_INDEX = `${PREFIX}run-log-index`
 const KEY_ARTIFACT_INDEX = `${PREFIX}artifact-index`
+const KEY_BACKTEST_RUN_INDEX = `${PREFIX}backtest-run-index`
+const KEY_STRATEGY_VERSION_INDEX = `${PREFIX}strategy-version-index`
 
 export function saveStrategyExternal(strategy: unknown): void {
   try {
@@ -75,6 +79,83 @@ export function deleteRunLog(runId: string): void {
   } catch {
     // ignore
   }
+}
+
+function backtestRunKey(runId: string): string {
+  return `${PREFIX}backtest-run:${runId}`
+}
+
+function strategyVersionKey(versionId: string): string {
+  return `${PREFIX}strategy-version:${versionId}`
+}
+
+function readIndex(key: string): string[] {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function writeIndex(key: string, values: string[]): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(values))
+  } catch {
+    // ignore
+  }
+}
+
+export function saveBacktestRunRecord(record: BacktestRunRecord): void {
+  try {
+    localStorage.setItem(backtestRunKey(record.id), JSON.stringify(record))
+    const index = readIndex(KEY_BACKTEST_RUN_INDEX)
+    const nextIndex = [record.id, ...index.filter(id => id !== record.id)].slice(0, 50)
+    writeIndex(KEY_BACKTEST_RUN_INDEX, nextIndex)
+  } catch {
+    // ignore
+  }
+}
+
+export function loadBacktestRunRecord(runId: string): BacktestRunRecord | null {
+  try {
+    const raw = localStorage.getItem(backtestRunKey(runId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+export function listBacktestRunRecords(): BacktestRunRecord[] {
+  return readIndex(KEY_BACKTEST_RUN_INDEX)
+    .map(loadBacktestRunRecord)
+    .filter((record): record is BacktestRunRecord => Boolean(record))
+}
+
+export function saveStrategyVersionRecord(record: StrategyVersionRecord): void {
+  try {
+    localStorage.setItem(strategyVersionKey(record.id), JSON.stringify(record))
+    const index = readIndex(KEY_STRATEGY_VERSION_INDEX)
+    const nextIndex = [record.id, ...index.filter(id => id !== record.id)].slice(0, 50)
+    writeIndex(KEY_STRATEGY_VERSION_INDEX, nextIndex)
+  } catch {
+    // ignore
+  }
+}
+
+export function loadStrategyVersionRecord(versionId: string): StrategyVersionRecord | null {
+  try {
+    const raw = localStorage.getItem(strategyVersionKey(versionId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+export function listStrategyVersionRecords(): StrategyVersionRecord[] {
+  return readIndex(KEY_STRATEGY_VERSION_INDEX)
+    .map(loadStrategyVersionRecord)
+    .filter((record): record is StrategyVersionRecord => Boolean(record))
 }
 
 function artifactKey(name: string): string {

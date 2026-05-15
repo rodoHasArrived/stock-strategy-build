@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { FolderOpen, ChartLine, TrendUp, ChartBar, Briefcase, CheckCircle, Intersect } from '@phosphor-icons/react'
 import { strategyTemplates, getAllCategories } from '@/lib/templates'
+import { fixtureStrategyDataProvider } from '@/lib/strategyDataProvider'
 
 interface TemplateGalleryProps {
   onLoadTemplate: (template: StrategyTemplate) => void
@@ -17,6 +18,7 @@ export function TemplateGallery({ onLoadTemplate }: TemplateGalleryProps) {
   const [open, setOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const categories = getAllCategories()
+  const datasets = fixtureStrategyDataProvider.listDatasets()
 
   const filteredTemplates = selectedCategory === 'all' 
     ? strategyTemplates 
@@ -78,48 +80,77 @@ export function TemplateGallery({ onLoadTemplate }: TemplateGalleryProps) {
           <TabsContent value={selectedCategory} className="flex-1 mt-4">
             <ScrollArea className="h-[calc(85vh-200px)]">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-4">
-                {filteredTemplates.map((template) => (
-                  <Card key={template.id} className="hover:border-accent transition-all hover:shadow-sm">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <CardTitle className="text-base flex items-center gap-2 mb-2">
-                            {getCategoryIcon(template.category)}
-                            {template.name}
-                          </CardTitle>
-                          <Badge variant="secondary" className="text-xs">
-                            {template.category}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <CardDescription className="text-sm line-clamp-2">
-                        {template.description}
-                      </CardDescription>
-                      
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                          <span className="text-muted-foreground">Cells</span>
-                          <span className="font-mono font-semibold">{template.strategy.cells.length}</span>
-                        </div>
-                        <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                          <span className="text-muted-foreground">Parameters</span>
-                          <span className="font-mono font-semibold">{template.strategy.parameters.length}</span>
-                        </div>
-                      </div>
+                {filteredTemplates.map((template) => {
+                  const compatibleDatasets = datasets.filter(dataset =>
+                    dataset.compatibleTemplateCategories.includes(template.category)
+                  )
+                  const recommendedDataset = compatibleDatasets[0]
+                  const isBacktestReady = Boolean(recommendedDataset)
 
-                      <Button 
-                        onClick={() => handleLoadTemplate(template)} 
-                        className="w-full gap-2"
-                        size="sm"
-                      >
-                        <CheckCircle size={16} weight="fill" />
-                        Load Strategy
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+                  return (
+                    <Card key={template.id} className="hover:border-accent transition-all hover:shadow-sm">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <CardTitle className="text-base flex items-center gap-2 mb-2">
+                              {getCategoryIcon(template.category)}
+                              {template.name}
+                            </CardTitle>
+                            <div className="flex flex-wrap gap-1.5">
+                              <Badge variant="secondary" className="text-xs">
+                                {template.category}
+                              </Badge>
+                              <Badge variant={isBacktestReady ? 'default' : 'outline'} className="text-xs">
+                                {isBacktestReady ? 'Backtest-ready' : 'Notebook only'}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <CardDescription className="text-sm line-clamp-2">
+                          {template.description}
+                        </CardDescription>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                            <span className="text-muted-foreground">Cells</span>
+                            <span className="font-mono font-semibold">{template.strategy.cells.length}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                            <span className="text-muted-foreground">Parameters</span>
+                            <span className="font-mono font-semibold">{template.strategy.parameters.length}</span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-md border bg-muted/30 p-3 text-xs">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">Expected dataset</span>
+                            <span className="font-medium">{recommendedDataset?.category ?? 'Custom data'}</span>
+                          </div>
+                          <div className="mt-1 flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">Recommendation</span>
+                            <span className="truncate font-medium">{recommendedDataset?.name ?? 'Attach a fixture before proof'}</span>
+                          </div>
+                          {recommendedDataset && (
+                            <div className="mt-2 font-mono text-[11px] text-muted-foreground">
+                              {recommendedDataset.symbols.join(', ')}
+                            </div>
+                          )}
+                        </div>
+
+                        <Button
+                          onClick={() => handleLoadTemplate(template)}
+                          className="w-full gap-2"
+                          size="sm"
+                        >
+                          <CheckCircle size={16} weight="fill" />
+                          Load Strategy
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
               
               {filteredTemplates.length === 0 && (

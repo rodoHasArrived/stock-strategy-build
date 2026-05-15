@@ -4,8 +4,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon, ChatCircle, NoteBlank, DotsSixVertical, Article, CopySimple, CaretDown, CaretRight, Rows, Table } from '@phosphor-icons/react'
-import { Card } from '@/components/ui/card'
+import { Play, CheckCircle, XCircle, Clock, ArrowRight, Shapes, Function as FunctionIcon, Code as CodeIcon, ChatCircle, NoteBlank, DotsSixVertical, Article, CopySimple, CaretDown, CaretRight, Table } from '@phosphor-icons/react'
 import { VisualBuilder } from '@/components/VisualBuilder'
 import { DataFieldSelector } from '@/components/DataFieldSelector'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -19,6 +18,35 @@ import { CellContractDisplay } from '@/components/CellContractDisplay'
 import type { OnMount } from '@monaco-editor/react'
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react'))
+
+const MODE_META: Record<CellMode, { label: string; description: string }> = {
+  visual: {
+    label: 'Visual builder',
+    description: 'Build filters and field selections without typing syntax'
+  },
+  formula: {
+    label: 'Formula editor',
+    description: 'Compose calculations with autocomplete and AMX functions'
+  },
+  code: {
+    label: 'Strategy code',
+    description: 'Use JavaScript plus basket and control-flow helpers'
+  }
+}
+
+const PURPOSE_LABELS: Record<CodeCellType['purpose'], string> = {
+  universe: 'Universe',
+  data: 'Data',
+  calculation: 'Calculation',
+  condition: 'Condition',
+  ranking: 'Ranking',
+  portfolio: 'Portfolio',
+  risk: 'Risk',
+  trade: 'Trade',
+  optimization: 'Optimization',
+  constraint: 'Constraint',
+  general: 'General'
+}
 
 interface CodeCellProps {
   cell: CodeCellType
@@ -63,6 +91,10 @@ export function CodeCellComponent({
   
   const cellComments = comments.filter(c => c.cellId === cell.id)
   const unresolvedComments = cellComments.filter(c => !c.parentId && !c.resolved).length
+  const modeMeta = MODE_META[cell.mode]
+  const purposeLabel = PURPOSE_LABELS[cell.purpose] ?? cell.purpose
+  const codeLineCount = cell.code.trim() ? cell.code.split('\n').length : 0
+  const hasOutput = Boolean(cell.output && cell.status !== 'error')
 
   const getStatusBadge = () => {
     switch (cell.status) {
@@ -175,183 +207,206 @@ export function CodeCellComponent({
   }, [appendSnippetToCode, onCodeChange])
 
   return (
-    <Card 
+    <section 
       id={`cell-${cell.index}`}
       onClick={() => setActiveMode(cell.mode)}
       onFocusCapture={() => setActiveMode(cell.mode)}
       className={cn(
-        'p-4 transition-all scroll-mt-6',
-        isActive && 'ring-2 ring-accent/35 border-accent/60',
-        cell.status === 'error' && 'border-destructive',
-        cell.status === 'success' && 'border-success',
+        'relative overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm transition-all scroll-mt-6',
+        isActive && 'ring-2 ring-accent/35 border-accent/60 shadow-md',
+        cell.status === 'error' && 'border-destructive/70',
+        cell.status === 'success' && 'border-success/70',
         cell.status === 'running' && 'ring-2 ring-accent'
       )}
     >
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing flex-shrink-0">
-              <DotsSixVertical size={20} weight="bold" className="text-muted-foreground hover:text-foreground transition-colors" />
-            </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0 flex-shrink-0"
-              onClick={() => onCellChange({ collapsed: !cell.collapsed })}
-              title={cell.collapsed ? 'Expand cell' : 'Collapse cell'}
-            >
-              {cell.collapsed
-                ? <CaretRight size={14} className="text-muted-foreground" />
-                : <CaretDown size={14} className="text-muted-foreground" />
-              }
-            </Button>
-            <span className="text-sm font-mono font-medium text-muted-foreground flex-shrink-0">
-              [{cell.index}]
-            </span>
-            
-            {cellLabel ? (
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <NoteBlank size={14} className="text-accent flex-shrink-0" weight="fill" />
-                <Input
-                  value={cellLabel}
-                  onChange={(e) => setCellLabel(e.target.value)}
-                  onBlur={() => {
-                    onCellChange({ label: cellLabel })
-                  }}
-                  placeholder="Cell label..."
-                  className="h-7 text-sm font-medium max-w-xs"
-                />
+      <div className={cn(
+        'absolute inset-y-0 left-0 w-1',
+        cell.status === 'success' && 'bg-success',
+        cell.status === 'error' && 'bg-destructive',
+        cell.status === 'running' && 'bg-accent',
+        (cell.status === 'idle' || cell.status === 'skipped') && 'bg-border'
+      )} />
+
+      <div className="space-y-0 pl-1">
+        <div className="border-b bg-muted/20 px-4 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div {...dragHandleProps} className="mt-1 cursor-grab active:cursor-grabbing flex-shrink-0">
+                <DotsSixVertical size={20} weight="bold" className="text-muted-foreground hover:text-foreground transition-colors" />
               </div>
-            ) : (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => setCellLabel('Cell Label')}
-              >
-                <NoteBlank size={14} className="mr-1" />
-                Add Label
-              </Button>
-            )}
-            
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {getStatusBadge()}
-              {cell.executionTime != null && (
-                <span className="text-xs text-muted-foreground">
-                  {cell.executionTime.toFixed(2)}ms
-                </span>
-              )}
-              {cell.rowCountDelta != null && (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'text-xs gap-1',
-                    cell.rowCountDelta > 0 && 'text-success border-success/30',
-                    cell.rowCountDelta < 0 && 'text-destructive border-destructive/30',
-                    cell.rowCountDelta === 0 && 'text-muted-foreground'
-                  )}
-                >
-                  <Rows size={12} />
-                  {cell.rowCountDelta > 0 ? '+' : ''}{cell.rowCountDelta} rows
-                </Badge>
-              )}
-              {cell.controlFlow && (
-                <Badge variant="outline" className="text-xs">
-                  {cell.controlFlow.type === 'goto' 
-                    ? `→ cell ${cell.controlFlow.target}`
-                    : cell.controlFlow.type
-                  }
-                </Badge>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Button
-              size="sm"
-              variant={cell.contract ? "default" : "outline"}
-              onClick={() => setShowContractEditor(!showContractEditor)}
-              className="h-8"
-            >
-              <Article size={16} className="mr-1" weight={cell.contract ? "fill" : "regular"} />
-              Contract
-            </Button>
-            {onAddComment && (
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant={unresolvedComments > 0 ? "default" : "outline"}
-                    className={cn(
-                      "h-8 relative",
-                      unresolvedComments > 0 && "pr-7"
-                    )}
-                  >
-                    <ChatCircle size={16} className="mr-1" weight={unresolvedComments > 0 ? "fill" : "regular"} />
-                    {unresolvedComments > 0 ? (
-                      <>
-                        Notes
-                        <Badge 
-                          variant="secondary" 
-                          className="ml-1.5 h-5 px-1.5 min-w-5 bg-background/50 absolute right-1"
-                        >
-                          {unresolvedComments}
-                        </Badge>
-                      </>
-                    ) : (
-                      'Notes'
-                    )}
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-[500px] sm:w-[600px] p-0">
-                  <SheetHeader className="p-6 pb-4">
-                    <SheetTitle>Cell [{cell.index}] Notes & Comments</SheetTitle>
-                  </SheetHeader>
-                  <div className="px-6 pb-6">
-                    <CellComments
-                      cellId={cell.id}
-                      comments={comments}
-                      onAddComment={(text, parentId) => onAddComment(cell.id, text, parentId)}
-                      onDeleteComment={onDeleteComment || (() => {})}
-                      onResolveComment={onResolveComment || (() => {})}
-                      currentUser={currentUser}
-                    />
-                  </div>
-                </SheetContent>
-              </Sheet>
-            )}
-            {onDuplicate && (
+
               <Button
                 size="sm"
-                variant="outline"
-                onClick={onDuplicate}
-                title="Duplicate cell"
+                variant="ghost"
+                className="mt-0.5 h-7 w-7 p-0 flex-shrink-0"
+                onClick={() => onCellChange({ collapsed: !cell.collapsed })}
+                title={cell.collapsed ? 'Expand cell' : 'Collapse cell'}
+              >
+                {cell.collapsed
+                  ? <CaretRight size={15} className="text-muted-foreground" />
+                  : <CaretDown size={15} className="text-muted-foreground" />
+                }
+              </Button>
+
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="font-mono text-[11px]">
+                    CELL {cell.index}
+                  </Badge>
+                  <Badge variant="secondary" className="text-[11px]">
+                    {purposeLabel}
+                  </Badge>
+                  {getStatusBadge()}
+                  {cell.controlFlow && (
+                    <Badge variant="outline" className="text-xs">
+                      {cell.controlFlow.type === 'goto' 
+                        ? `→ cell ${cell.controlFlow.target}`
+                        : cell.controlFlow.type
+                      }
+                    </Badge>
+                  )}
+                </div>
+
+                {cellLabel ? (
+                  <div className="flex max-w-2xl items-center gap-2">
+                    <NoteBlank size={15} className="text-accent flex-shrink-0" weight="fill" />
+                    <Input
+                      value={cellLabel}
+                      onChange={(e) => setCellLabel(e.target.value)}
+                      onBlur={() => {
+                        onCellChange({ label: cellLabel })
+                      }}
+                      placeholder="Cell label..."
+                      className="h-8 min-w-0 border-transparent bg-background/80 text-sm font-medium shadow-none focus-visible:border-ring"
+                    />
+                  </div>
+                ) : (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setCellLabel('Cell Label')}
+                  >
+                    <NoteBlank size={14} className="mr-1" />
+                    Add Label
+                  </Button>
+                )}
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span>{modeMeta.label}</span>
+                  <span className="hidden sm:inline">·</span>
+                  <span>{codeLineCount} line{codeLineCount === 1 ? '' : 's'}</span>
+                  {cell.executionTime != null && (
+                    <>
+                      <span className="hidden sm:inline">·</span>
+                      <span>{cell.executionTime.toFixed(2)}ms</span>
+                    </>
+                  )}
+                  {cell.rowCountDelta != null && (
+                    <>
+                      <span className="hidden sm:inline">·</span>
+                      <span className={cn(
+                        cell.rowCountDelta > 0 && 'text-success',
+                        cell.rowCountDelta < 0 && 'text-destructive'
+                      )}>
+                        {cell.rowCountDelta > 0 ? '+' : ''}{cell.rowCountDelta} rows
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 lg:flex-shrink-0">
+              <Button
+                size="sm"
+                variant={cell.contract ? "default" : "outline"}
+                onClick={() => setShowContractEditor(!showContractEditor)}
                 className="h-8"
               >
-                <CopySimple size={16} />
+                <Article size={16} className="mr-1" weight={cell.contract ? "fill" : "regular"} />
+                Contract
               </Button>
-            )}
-            <Button
-              size="sm"
-              onClick={onRun}
-              disabled={cell.status === 'running'}
-            >
-              <Play size={16} className="mr-1" weight="fill" />
-              Run
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onDelete}
-            >
-              Delete
-            </Button>
+              {onAddComment && (
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant={unresolvedComments > 0 ? "default" : "outline"}
+                      className={cn(
+                        "h-8 relative",
+                        unresolvedComments > 0 && "pr-7"
+                      )}
+                    >
+                      <ChatCircle size={16} className="mr-1" weight={unresolvedComments > 0 ? "fill" : "regular"} />
+                      {unresolvedComments > 0 ? (
+                        <>
+                          Notes
+                          <Badge 
+                            variant="secondary" 
+                            className="ml-1.5 h-5 px-1.5 min-w-5 bg-background/50 absolute right-1"
+                          >
+                            {unresolvedComments}
+                          </Badge>
+                        </>
+                      ) : (
+                        'Notes'
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-[500px] sm:w-[600px] p-0">
+                    <SheetHeader className="p-6 pb-4">
+                      <SheetTitle>Cell [{cell.index}] Notes & Comments</SheetTitle>
+                    </SheetHeader>
+                    <div className="px-6 pb-6">
+                      <CellComments
+                        cellId={cell.id}
+                        comments={comments}
+                        onAddComment={(text, parentId) => onAddComment(cell.id, text, parentId)}
+                        onDeleteComment={onDeleteComment || (() => {})}
+                        onResolveComment={onResolveComment || (() => {})}
+                        currentUser={currentUser}
+                      />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              )}
+              {onDuplicate && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onDuplicate}
+                  title="Duplicate cell"
+                  className="h-8"
+                >
+                  <CopySimple size={16} />
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={onRun}
+                disabled={cell.status === 'running'}
+                className="h-8 min-w-20"
+              >
+                <Play size={16} className="mr-1" weight="fill" />
+                Run
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onDelete}
+                className="h-8 text-muted-foreground hover:text-destructive"
+              >
+                Delete
+              </Button>
+            </div>
           </div>
         </div>
 
         {cell.collapsed ? null : (
-          <>
+          <div className="space-y-4 p-4">
             {showContractEditor && (
-              <div className="mb-3">
+              <div>
                 <CellContractEditor
                   contract={cell.contract}
                   onChange={handleContractChange}
@@ -361,7 +416,7 @@ export function CodeCellComponent({
             )}
 
             {!showContractEditor && cell.contract && (
-              <div className="mb-3">
+              <div>
                 <CellContractDisplay
                   contract={cell.contract}
                   validationResult={cell.validationResult}
@@ -378,7 +433,12 @@ export function CodeCellComponent({
                 setActiveMode(nextMode)
               }}
             >
-              <TabsList className="grid w-full grid-cols-3">
+              <div className="flex flex-col gap-3 rounded-md border bg-background/60 p-3 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">{modeMeta.label}</div>
+                  <div className="text-xs text-muted-foreground">{modeMeta.description}</div>
+                </div>
+                <TabsList className="grid w-full grid-cols-3 md:w-[360px]">
                 <TabsTrigger value="visual" className="text-xs">
                   <Shapes size={14} className="mr-1" />
                   Visual
@@ -391,7 +451,8 @@ export function CodeCellComponent({
                   <CodeIcon size={14} className="mr-1" />
                   Code
                 </TabsTrigger>
-              </TabsList>
+                </TabsList>
+              </div>
 
               <TabsContent value="visual" className="space-y-3 mt-3">
                 <ScrollArea className="max-h-[400px]">
@@ -424,6 +485,11 @@ export function CodeCellComponent({
 
               <TabsContent value="formula" className="mt-3">
                 <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <Badge variant="outline">AMX functions</Badge>
+                    <Badge variant="outline">Autocomplete</Badge>
+                    <Badge variant="outline">Cmd/Ctrl+Enter runs</Badge>
+                  </div>
                   <FormulaAutocomplete
                      value={cell.code}
                      onChange={onCodeChange}
@@ -441,9 +507,20 @@ export function CodeCellComponent({
 
                <TabsContent value="code" className="mt-3">
                  <div className="space-y-2">
+                   <div className="flex flex-col gap-2 rounded-md border bg-muted/30 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                     <div className="flex flex-wrap items-center gap-2 text-xs">
+                       <Badge variant="outline">JavaScript</Badge>
+                       <Badge variant="outline">basket Name:</Badge>
+                       <Badge variant="outline">result(value)</Badge>
+                       <Badge variant="outline">goto(5)</Badge>
+                     </div>
+                     <div className="text-xs text-muted-foreground">
+                       Drag fields in or press Cmd/Ctrl+Enter to run
+                     </div>
+                   </div>
                    <div
                      className={cn(
-                       'overflow-hidden rounded-md border border-border bg-slate-950 transition-colors',
+                       'overflow-hidden rounded-md border border-border bg-slate-950 shadow-inner transition-colors',
                        isCodeDropTarget && 'border-accent ring-2 ring-accent/30'
                      )}
                      onDragOver={(e) => {
@@ -464,8 +541,8 @@ export function CodeCellComponent({
                      <Suspense fallback={<div role="status" aria-live="polite" className="flex h-[320px] items-center justify-center text-sm text-muted-foreground">Loading code editor…</div>}>
                        <MonacoEditor
                          height="320px"
-                        defaultLanguage="python"
-                        path={`${cell.id}.py`}
+                        defaultLanguage="javascript"
+                        path={`${cell.id}.js`}
                         value={cell.code}
                         onMount={handleCodeEditorMount}
                         onChange={(value) => onCodeChange(value ?? '')}
@@ -486,43 +563,46 @@ export function CodeCellComponent({
                       />
                     </Suspense>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                     Code editor with syntax highlighting. Drag fields in or press Cmd/Ctrl+Enter to run.
-                  </div>
                 </div>
               </TabsContent>
             </Tabs>
 
-            {cell.output && cell.status !== 'error' && (
-              <div className="border-l-4 border-success pl-3 py-2">
-                <div className="text-xs text-muted-foreground mb-1">Output:</div>
-                <pre className="font-mono text-sm whitespace-pre-wrap">{cell.output}</pre>
+            {hasOutput && (
+              <div className="overflow-hidden rounded-md border border-success/25 bg-success/5">
+                <div className="flex items-center gap-2 border-b border-success/20 px-3 py-2 text-xs font-medium text-success">
+                  <CheckCircle size={14} weight="fill" />
+                  Output
+                </div>
+                <pre className="max-h-48 overflow-auto whitespace-pre-wrap p-3 font-mono text-sm">{cell.output}</pre>
               </div>
             )}
 
             {cell.sampleOutput && cell.status === 'success' && cell.sampleOutput.startsWith('[') && (
-              <div className="border-l-4 border-accent/50 pl-3 py-2">
-                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+              <div className="overflow-hidden rounded-md border border-accent/25 bg-accent/5">
+                <div className="flex items-center gap-1 border-b border-accent/20 px-3 py-2 text-xs font-medium text-accent">
                   <Table size={12} />
-                  Sample output (first 3 rows):
+                  Sample output
                 </div>
-                <pre className="font-mono text-xs whitespace-pre-wrap text-muted-foreground max-h-[120px] overflow-auto">
+                <pre className="font-mono text-xs whitespace-pre-wrap text-muted-foreground max-h-[160px] overflow-auto p-3">
                   {cell.sampleOutput}
                 </pre>
               </div>
             )}
 
             {cell.error && (
-              <div className="border-l-4 border-destructive pl-3 py-2">
-                <div className="text-xs text-destructive mb-1">Error:</div>
-                <pre className="font-mono text-sm text-destructive whitespace-pre-wrap">
+              <div className="overflow-hidden rounded-md border border-destructive/30 bg-destructive/5">
+                <div className="flex items-center gap-2 border-b border-destructive/20 px-3 py-2 text-xs font-medium text-destructive">
+                  <XCircle size={14} weight="fill" />
+                  Error
+                </div>
+                <pre className="max-h-56 overflow-auto whitespace-pre-wrap p-3 font-mono text-sm text-destructive">
                   {cell.error}
                 </pre>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
-    </Card>
+    </section>
   )
 }

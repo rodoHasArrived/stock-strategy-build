@@ -336,6 +336,53 @@ export interface BacktestConfig {
   customSlippageFn?: string
 }
 
+export type DatasetFingerprint = string
+
+export interface StrategyDatasetProvenance {
+  provider: string
+  source: string
+  asOf: string
+  notes?: string
+}
+
+export interface StrategyDataset {
+  id: string
+  name: string
+  description: string
+  category: 'fixed-income' | 'equity' | 'sector' | 'factor' | 'custom'
+  symbols: string[]
+  period: string
+  dataType: string
+  useCase: string
+  fields: string[]
+  rowCounts: Record<string, number>
+  startDate?: string
+  endDate?: string
+  coupons?: Record<string, number>
+  provenance: StrategyDatasetProvenance
+  fingerprint: DatasetFingerprint
+  data: Record<string, any>
+  strategyTemplate: string
+  compatibleTemplateCategories: string[]
+}
+
+export interface StrategyDataProvider {
+  id: string
+  name: string
+  listDatasets: () => StrategyDataset[]
+  loadDataset: (datasetId: string) => StrategyDataset | undefined
+}
+
+export type BacktestDiagnosticSeverity = 'info' | 'warning' | 'error'
+
+export interface BacktestDiagnostic {
+  id: string
+  severity: BacktestDiagnosticSeverity
+  message: string
+  symbol?: string
+  date?: string
+}
+
 export interface BacktestPosition {
   symbol: string
   shares: number
@@ -373,6 +420,35 @@ export interface BacktestResult {
   trades: BacktestTrade[]
   metrics: BacktestMetrics
   positions: BacktestPosition[]
+  diagnostics?: BacktestDiagnostic[]
+}
+
+export interface BacktestRunRecord {
+  id: string
+  strategyId: string
+  strategyName: string
+  timestamp: number
+  config: BacktestConfig
+  strategyCode: string
+  datasetId?: string
+  datasetName: string
+  datasetFingerprint: DatasetFingerprint
+  result: BacktestResult
+  diagnostics: BacktestDiagnostic[]
+  freshness: 'current' | 'stale'
+}
+
+export interface StrategyVersionRecord {
+  id: string
+  strategyId: string
+  strategyName: string
+  version: number
+  label: string
+  author: string
+  timestamp: number
+  strategy: Strategy
+  linkedRunIds: string[]
+  audit: AuditEntry[]
 }
 
 export interface TimeSeriesData {

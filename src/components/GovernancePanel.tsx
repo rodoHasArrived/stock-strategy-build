@@ -18,12 +18,15 @@ import {
   ArrowRight,
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
-import { GovernanceConfig, ReviewStatus, AuditEntry } from '@/lib/types'
+import { BacktestRunRecord, GovernanceConfig, ReviewStatus, AuditEntry, StrategyVersionRecord } from '@/lib/types'
 
 interface GovernancePanelProps {
   governance: GovernanceConfig
   onGovernanceChange: (config: GovernanceConfig) => void
   currentUser?: string
+  currentRunRecord?: BacktestRunRecord | null
+  proofIsStale?: boolean
+  latestVersion?: StrategyVersionRecord
 }
 
 const REVIEW_STATUS_LABELS: Record<ReviewStatus, { label: string; color: string; icon: React.ReactNode }> = {
@@ -54,9 +57,17 @@ function formatTimestamp(ts: number): string {
   return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
 }
 
-export function GovernancePanel({ governance, onGovernanceChange, currentUser }: GovernancePanelProps) {
+export function GovernancePanel({
+  governance,
+  onGovernanceChange,
+  currentUser,
+  currentRunRecord,
+  proofIsStale = false,
+  latestVersion,
+}: GovernancePanelProps) {
   const [reviewerInput, setReviewerInput] = useState('')
   const status = REVIEW_STATUS_LABELS[governance.reviewStatus]
+  const canApprove = Boolean(currentRunRecord && !proofIsStale)
 
   const addAuditEntry = (action: string, details?: string) => {
     const entry: AuditEntry = {
@@ -73,6 +84,7 @@ export function GovernancePanel({ governance, onGovernanceChange, currentUser }:
   }
 
   const handleStatusChange = (value: ReviewStatus) => {
+    if (value === 'approved' && !canApprove) return
     const prev = governance.reviewStatus
     onGovernanceChange({ ...governance, reviewStatus: value })
     addAuditEntry(`Status changed: ${prev} → ${value}`)
@@ -132,6 +144,25 @@ export function GovernancePanel({ governance, onGovernanceChange, currentUser }:
           )}
         </div>
 
+        <div className="rounded-md border bg-muted/30 p-3 text-xs">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-medium text-foreground">Current Proof</span>
+            <Badge variant={canApprove ? 'default' : 'outline'} className="text-[10px]">
+              {canApprove ? 'current' : currentRunRecord ? 'stale' : 'missing'}
+            </Badge>
+          </div>
+          <div className="mt-2 text-muted-foreground">
+            {currentRunRecord
+              ? `${currentRunRecord.datasetName} / ${currentRunRecord.result.trades.length} trades / ${new Date(currentRunRecord.timestamp).toLocaleString()}`
+              : 'Run a backtest before approval.'}
+          </div>
+          {latestVersion && (
+            <div className="mt-2 text-muted-foreground">
+              Last saved: {latestVersion.label} / {new Date(latestVersion.timestamp).toLocaleString()}
+            </div>
+          )}
+        </div>
+
         {/* Review status */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Review Status</label>
@@ -141,10 +172,11 @@ export function GovernancePanel({ governance, onGovernanceChange, currentUser }:
             </SelectTrigger>
             <SelectContent>
               {(Object.keys(REVIEW_STATUS_LABELS) as ReviewStatus[]).map(s => (
-                <SelectItem key={s} value={s} className="text-sm">
+                <SelectItem key={s} value={s} className="text-sm" disabled={s === 'approved' && !canApprove}>
                   <span className="flex items-center gap-2">
                     {REVIEW_STATUS_LABELS[s].icon}
                     {REVIEW_STATUS_LABELS[s].label}
+                    {s === 'approved' && !canApprove ? ' (requires current proof)' : ''}
                   </span>
                 </SelectItem>
               ))}
